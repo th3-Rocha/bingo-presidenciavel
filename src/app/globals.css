@@ -48,73 +48,65 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ───────── Design system: Bingo do Debate ─────────
+   Paleta: vermelho PT × verde-amarelo, sobre azul "noite de debate".
+   Tudo que é cor no app sai daqui. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* marca */
+  --pt: oklch(0.55 0.22 27);          /* vermelho estrela */
+  --pt-deep: oklch(0.42 0.18 27);
+  --verde: oklch(0.58 0.15 152);      /* verde bandeira */
+  --verde-deep: oklch(0.44 0.12 152);
+  --amarelo: oklch(0.9 0.18 98);      /* amarelo bandeira */
+  --azul: oklch(0.3 0.12 262);        /* azul bandeira */
+  --noite: oklch(0.17 0.05 262);      /* fundo */
+  --papel: oklch(0.97 0.015 95);      /* texto claro, quente */
+
+  /* papéis do shadcn mapeados pra marca */
+  --background: var(--noite);
+  --foreground: var(--papel);
+  --card: oklch(0.22 0.06 262);
+  --card-foreground: var(--papel);
+  --popover: oklch(0.22 0.06 262);
+  --popover-foreground: var(--papel);
+  --primary: var(--amarelo);
+  --primary-foreground: oklch(0.2 0.05 262);
+  --secondary: oklch(0.28 0.07 262);
+  --secondary-foreground: var(--papel);
+  --muted: oklch(0.25 0.06 262);
+  --muted-foreground: oklch(0.75 0.03 262);
+  --accent: oklch(0.3 0.08 262);
+  --accent-foreground: var(--papel);
+  --destructive: var(--pt);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: var(--amarelo);
+  --chart-1: var(--pt);
+  --chart-2: var(--verde);
+  --chart-3: var(--amarelo);
+  --chart-4: var(--azul);
+  --chart-5: oklch(0.7 0 0);
+  --radius: 0.75rem;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--papel);
+  --sidebar-primary: var(--amarelo);
+  --sidebar-primary-foreground: var(--noite);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--papel);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@theme inline {
+  --color-pt: var(--pt);
+  --color-pt-deep: var(--pt-deep);
+  --color-verde: var(--verde);
+  --color-verde-deep: var(--verde-deep);
+  --color-amarelo: var(--amarelo);
+  --color-azul: var(--azul);
+  --color-noite: var(--noite);
+  --color-papel: var(--papel);
+  --font-display: var(--font-anton);
 }
 
 @layer base {
@@ -127,4 +119,32 @@
   html {
     @apply font-sans;
   }
+}
+@layer components {
+  /* fundo com brilho verde/vermelho nas bordas */
+  .bg-debate {
+    background:
+      radial-gradient(60rem 30rem at 0% 0%, oklch(0.55 0.22 27 / 0.22), transparent 60%),
+      radial-gradient(60rem 30rem at 100% 0%, oklch(0.58 0.15 152 / 0.22), transparent 60%),
+      var(--noite);
+  }
+  /* faixa xadrez vermelho × verde */
+  .xadrez-faixa {
+    background: repeating-conic-gradient(var(--pt) 0 25%, var(--verde) 0 50%) 0 0 / 16px 16px;
+  }
+  .stamp {
+    animation: stamp 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
+  }
+  .saiu {
+    animation: saiu 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes stamp {
+  from { transform: scale(1.8) rotate(-20deg); opacity: 0; }
+  to { transform: scale(1) rotate(-12deg); opacity: 1; }
+}
+@keyframes saiu {
+  0%, 100% { box-shadow: inset 0 0 0 3px var(--amarelo); }
+  50% { box-shadow: inset 0 0 0 3px transparent; }
 }
