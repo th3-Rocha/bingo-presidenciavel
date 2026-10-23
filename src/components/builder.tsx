@@ -35,9 +35,10 @@ import {
 type Props = {
   slots: Slots
   onChange: (slots: Slots) => void
+  said: Set<string>
 }
 
-export function Builder({ slots, onChange }: Props) {
+export function Builder({ slots, onChange, said }: Props) {
   const [dragging, setDragging] = useState<Cell | null>(null)
   const [side, setSide] = useState<Speaker>("lula")
   const [target, setTarget] = useState<number | null>(null)
@@ -132,6 +133,7 @@ export function Builder({ slots, onChange }: Props) {
             onClear={clear}
             target={target}
             onTarget={pickTarget}
+            said={said}
           />
           <Checklist {...p} />
         </div>

@@ -24,6 +24,7 @@ import {
   loadCard,
   progress,
   saveCard,
+  tally,
   score,
   slotToBoard,
 } from "@/lib/card"
@@ -87,7 +88,15 @@ export function BingoApp() {
       {live.locked ? (
         <PlayView card={card} said={live.said} events={live.events} onChange={setCard} />
       ) : (
-        <Builder slots={card.slots} onChange={(slots) => setCard({ ...card, slots })} />
+        <>
+          {/* Before 21h20 the feed already scores the card, so the admin can be tested live. */}
+          <ScoreBanner
+            marked={marksFor(card.slots, [], live.said)}
+            misses={tally(card.slots, live.said).misses}
+          />
+          <Builder slots={card.slots} said={live.said} onChange={(slots) => setCard({ ...card, slots })} />
+          {live.events.length > 0 && <LiveFeed events={live.events} />}
+        </>
       )}
 
       {/* Always-visible bar: name + share, so nobody has to scroll back up on a phone. */}
@@ -208,7 +217,7 @@ function PlayView({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
       <div className="flex flex-col gap-3">
-        <ScoreBanner marked={marked} />
+        <ScoreBanner marked={marked} misses={tally(card.slots, said).misses} />
         <PlayBoard slots={card.slots as Cell[]} marked={marked} said={said} onToggle={toggle} />
         <Legend />
       </div>
@@ -265,7 +274,7 @@ function SharedView({ shared, said, onBuildOwn }: { shared: Shared; said: Set<st
           Montar a minha
         </Button>
       </div>
-      {said.size > 0 && <ScoreBanner marked={marked} />}
+      {said.size > 0 && <ScoreBanner marked={marked} misses={tally(shared.slots, said).misses} />}
       {complete && <PlayBoard slots={shared.slots as Cell[]} marked={marked} said={said} />}
     </div>
   )

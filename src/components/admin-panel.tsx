@@ -25,6 +25,8 @@ export function AdminPanel() {
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Sent from this panel but not yet back from the (cached) feed: show as done right away.
+  const [sent, setSent] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     try {
@@ -57,10 +59,25 @@ export function AdminPanel() {
     }
   }
 
-  const send = (text: string, speaker: Who) =>
-    call(saidKey(text, speaker), { method: "POST", body: JSON.stringify({ text, speaker }) })
+  const send = async (text: string, speaker: Who) => {
+    const key = saidKey(text, speaker)
+    if (await call(key, { method: "POST", body: JSON.stringify({ text, speaker }) })) {
+      setSent((s) => new Set(s).add(key))
+    }
+  }
 
-  const undo = (id: number) => call(`del:${id}`, { method: "DELETE", path: `/api/events?id=${id}` })
+  const undo = async (id: number) => {
+    const ev = live.events.find((e) => e.id === id)
+    if (await call(`del:${id}`, { method: "DELETE", path: `/api/events?id=${id}` }) && ev) {
+      setSent((s) => {
+        const next = new Set(s)
+        next.delete(saidKey(ev.text, ev.speaker))
+        return next
+      })
+    }
+  }
+
+  const done = new Set([...live.said, ...sent])
 
   if (!token) {
     return (
@@ -113,9 +130,9 @@ export function AdminPanel() {
           />
         </label>
         <div className="flex flex-col gap-1">
-          {freeText && <PhraseRow text={freeText} said={live.said} busy={busy} onSend={send} isNew />}
+          {freeText && <PhraseRow text={freeText} said={done} busy={busy} onSend={send} isNew />}
           {phrases.map((text) => (
-            <PhraseRow key={text} text={text} said={live.said} busy={busy} onSend={send} />
+            <PhraseRow key={text} text={text} said={done} busy={busy} onSend={send} />
           ))}
         </div>
       </div>

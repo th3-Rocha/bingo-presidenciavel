@@ -1,5 +1,6 @@
 import { connection, type NextRequest } from "next/server"
 
+import { saidKey } from "@/lib/card"
 import { addEvent, listEvents, removeEvent } from "@/lib/events"
 import type { Speaker } from "@/lib/phrases"
 
@@ -27,6 +28,10 @@ export async function POST(req: NextRequest) {
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, 80) : ""
   if (!text) return Response.json({ error: "text required" }, { status: 400 })
   const speaker = SPEAKERS.includes(body?.speaker as Speaker) ? (body!.speaker as Speaker) : null
+  // Same phrase + same speaker twice is a double tap, not a new event.
+  const key = saidKey(text, speaker)
+  const existing = (await listEvents()).find((e) => saidKey(e.text, e.speaker) === key)
+  if (existing) return Response.json(existing)
   return Response.json(await addEvent(text, speaker), { status: 201 })
 }
 

@@ -5,7 +5,17 @@ import { Check, X } from "lucide-react"
 
 import { Flag, Star } from "@/components/star"
 import { cn } from "@/lib/utils"
-import { type Cell, CENTER, SIZE, type Slots, boardToSlot, cellSaid, score, speakerAt } from "@/lib/card"
+import {
+  type Cell,
+  type CellStatus,
+  CENTER,
+  SIZE,
+  type Slots,
+  boardToSlot,
+  cellStatus,
+  score,
+  speakerAt,
+} from "@/lib/card"
 
 type Tone = "pt" | "verde"
 
@@ -21,13 +31,13 @@ export function CellFace({
   cell,
   tone,
   marked = false,
-  saiu = false,
+  status = null,
   className,
 }: {
   cell: Cell
   tone: Tone
   marked?: boolean
-  saiu?: boolean
+  status?: CellStatus
   className?: string
 }) {
   return (
@@ -35,7 +45,8 @@ export function CellFace({
       className={cn(
         "relative flex size-full items-center justify-center overflow-hidden rounded-lg p-1 text-center shadow-[inset_0_-3px_0_oklch(0_0_0/0.2)] sm:p-2",
         toneBg[tone],
-        saiu && "saiu",
+        status?.result === "hit" && "saiu",
+        status?.result === "miss" && "opacity-45 grayscale-[0.6]",
         className
       )}
     >
@@ -55,12 +66,26 @@ export function CellFace({
       >
         {cell.text}
       </span>
-      {saiu && (
-        <span className="absolute top-0.5 right-0.5 z-10 rounded bg-amarelo px-1 font-display text-[0.5rem] tracking-wider text-noite sm:text-[0.6rem]">
-          SAIU
-        </span>
+      {status?.result === "miss" && (
+        <span className="pointer-events-none absolute inset-x-1 top-1/2 z-10 h-0.5 -rotate-12 bg-papel/80" />
       )}
+      {status && <StatusTag status={status} />}
     </div>
+  )
+}
+
+function StatusTag({ status }: { status: NonNullable<CellStatus> }) {
+  const who = status.by === "lula" ? "Lula" : status.by === "flavio" ? "Flávio" : "Ambos"
+  const hit = status.result === "hit"
+  return (
+    <span
+      className={cn(
+        "absolute top-0.5 left-0.5 z-20 rounded px-1 font-display text-[0.5rem] leading-tight tracking-wider uppercase sm:text-[0.65rem]",
+        hit ? "bg-amarelo text-noite" : "bg-noite text-papel ring-1 ring-papel/40"
+      )}
+    >
+      {hit ? "✓" : "✗"} {who}
+    </span>
   )
 }
 
@@ -135,7 +160,7 @@ export function PlayBoard({
               winning.has(i) && "rounded-xl ring-4 ring-amarelo"
             )}
           >
-            <CellFace cell={cell} tone={toneOf(i)} marked={marked.has(i)} saiu={cellSaid(cell, i, said)} />
+            <CellFace cell={cell} tone={toneOf(i)} marked={marked.has(i)} status={cellStatus(cell, i, said)} />
           </button>
         )
       })}
@@ -149,10 +174,11 @@ type BuildProps = {
   /** Empty square picked by tapping: the next phrase goes there. */
   target?: number | null
   onTarget?: (slot: number) => void
+  said?: Set<string>
 }
 
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear, target, onTarget }: BuildProps) {
+export function BuildBoard({ slots, onClear, target, onTarget, said }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
@@ -166,6 +192,7 @@ export function BuildBoard({ slots, onClear, target, onTarget }: BuildProps) {
             onClear={onClear}
             target={target}
             onTarget={onTarget}
+            said={said}
           />
         )
       )}
@@ -179,6 +206,7 @@ function BuildSlot({
   onClear,
   target,
   onTarget,
+  said,
 }: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
   const slot = boardToSlot(index)
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `slot:${slot}` })
@@ -205,7 +233,12 @@ function BuildSlot({
             isDragging && "opacity-30"
           )}
         >
-          <CellFace cell={cell} tone={tone} />
+          <CellFace
+            cell={cell}
+            tone={tone}
+            status={said ? cellStatus(cell, index, said) : null}
+            marked={said ? cellStatus(cell, index, said)?.result === "hit" : false}
+          />
           <button
             type="button"
             aria-label="Tirar"
@@ -235,7 +268,7 @@ function BuildSlot({
   )
 }
 
-export function ScoreBanner({ marked }: { marked: Set<number> }) {
+export function ScoreBanner({ marked, misses = 0 }: { marked: Set<number>; misses?: number }) {
   const { hits, lines, full, points } = score(marked)
   return (
     <div
@@ -244,11 +277,18 @@ export function ScoreBanner({ marked }: { marked: Set<number> }) {
         lines.length ? "bg-amarelo text-noite" : "bg-card ring-1 ring-border"
       )}
     >
-      <span className="font-display text-2xl tracking-wide uppercase sm:text-3xl">
-        {full ? "Cartela cheia! 🏆" : lines.length ? `Bingo!${lines.length > 1 ? ` ×${lines.length}` : ""} 🎉` : `${hits}/24 acertos`}
-      </span>
+      <div className="flex flex-col">
+        <span className="font-display text-2xl leading-none tracking-wide uppercase sm:text-3xl">
+          {full ? "Cartela cheia! 🏆" : lines.length ? `Bingo!${lines.length > 1 ? ` ×${lines.length}` : ""} 🎉` : "Placar"}
+        </span>
+        <span className="mt-1 flex gap-3 text-sm font-semibold tabular-nums">
+          <span>✓ {hits} acerto{hits === 1 ? "" : "s"}</span>
+          <span className="opacity-70">✗ {misses} erro{misses === 1 ? "" : "s"}</span>
+          {lines.length > 0 && <span>▦ {lines.length} linha{lines.length === 1 ? "" : "s"}</span>}
+        </span>
+      </div>
       <span className="flex items-baseline gap-1">
-        <strong className="font-display text-3xl tabular-nums sm:text-4xl">{points}</strong>
+        <strong className="font-display text-4xl tabular-nums sm:text-5xl">{points}</strong>
         <span className="text-sm opacity-70">pts</span>
       </span>
     </div>

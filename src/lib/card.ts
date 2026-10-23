@@ -59,6 +59,29 @@ export const saidKey = (text: string, speaker: Speaker | null) => `${speaker ?? 
 export const cellSaid = (cell: Cell, boardIndex: number, said: Set<string>) =>
   said.has(saidKey(cell.text, null)) || said.has(saidKey(cell.text, speakerAt(boardIndex)))
 
+export type CellStatus = { result: "hit" | "miss"; by: Speaker | null } | null
+
+/** Hit: said by the square's candidate (or "ambos"). Miss: only the other one said it. */
+export function cellStatus(cell: Cell, boardIndex: number, said: Set<string>): CellStatus {
+  const mine = speakerAt(boardIndex)
+  const other: Speaker = mine === "lula" ? "flavio" : "lula"
+  if (said.has(saidKey(cell.text, mine))) return { result: "hit", by: mine }
+  if (said.has(saidKey(cell.text, null))) return { result: "hit", by: null }
+  if (said.has(saidKey(cell.text, other))) return { result: "miss", by: other }
+  return null
+}
+
+export function tally(slots: Slots, said: Set<string>) {
+  let hits = 0
+  let misses = 0
+  slots.forEach((c, s) => {
+    const st = c && cellStatus(c, slotToBoard(s), said)
+    if (st?.result === "hit") hits++
+    if (st?.result === "miss") misses++
+  })
+  return { hits, misses }
+}
+
 export function shuffle<T>(items: T[]): T[] {
   const out = [...items]
   for (let i = out.length - 1; i > 0; i--) {
