@@ -151,17 +151,19 @@ export function PlayBoard({
 type BuildProps = {
   slots: Slots
   onClear: (slot: number) => void
+  /** Once the list quota is used up, empty squares can only take the player's own phrases. */
+  ownOnly?: boolean
 }
 
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear }: BuildProps) {
+export function BuildBoard({ slots, onClear, ownOnly }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
         i === CENTER ? (
           <FreeCell key={i} win={false} />
         ) : (
-          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} />
+          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} ownOnly={ownOnly} />
         )
       )}
     </BoardFrame>
@@ -172,6 +174,7 @@ function BuildSlot({
   index,
   cell,
   onClear,
+  ownOnly,
 }: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
   const slot = boardToSlot(index)
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `slot:${slot}` })
@@ -212,11 +215,19 @@ function BuildSlot({
       ) : (
         <div
           className={cn(
-            "flex size-full items-center justify-center rounded-lg border-2 border-dashed font-display text-xl",
-            tone === "pt" ? "border-pt/60 bg-pt/10 text-pt/70" : "border-verde/60 bg-verde/10 text-verde/70"
+            "flex size-full flex-col items-center justify-center rounded-lg border-2 border-dashed font-display",
+            tone === "pt" ? "border-pt/60 bg-pt/10 text-pt/70" : "border-verde/60 bg-verde/10 text-verde/70",
+            ownOnly && "border-amarelo/70 text-amarelo"
           )}
         >
-          +
+          {ownOnly ? (
+            <>
+              <PenLine className="size-4 sm:size-5" />
+              <span className="text-[0.55rem] tracking-widest sm:text-xs">SUA</span>
+            </>
+          ) : (
+            <span className="text-xl">+</span>
+          )}
         </div>
       )}
     </div>

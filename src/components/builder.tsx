@@ -123,7 +123,7 @@ export function Builder({ slots, onChange }: Props) {
               </Button>
             </div>
           </div>
-          <BuildBoard slots={slots} onClear={clear} />
+          <BuildBoard slots={slots} onClear={clear} ownOnly={p.list >= LIST_MAX} />
           <Checklist {...p} />
         </div>
 

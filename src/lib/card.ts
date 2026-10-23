@@ -81,13 +81,12 @@ export function fillFromList(slots: Slots): Slots {
   const { filled, custom } = progress(slots)
   const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
   const extra = shuffle(POOL.filter((t) => !used.has(normalize(t))))
-  let room = SLOTS - filled - Math.max(0, CUSTOM_REQUIRED - custom)
-  return slots.map((c) => {
-    if (c) return c
-    if (room <= 0) return null
-    room--
-    return { text: extra.pop()! }
-  })
+  const room = SLOTS - filled - Math.max(0, CUSTOM_REQUIRED - custom)
+  // Pick which gaps get filled at random, so the spots left for the player's own
+  // phrases are spread over the card instead of always being the bottom row.
+  const gaps = shuffle(slots.flatMap((c, i) => (c ? [] : [i])))
+  const toFill = new Set(gaps.slice(0, Math.max(0, room)))
+  return slots.map((c, i) => c ?? (toFill.has(i) ? { text: extra.pop()! } : null))
 }
 
 // At lock time everyone gets a full, fully assigned card.
