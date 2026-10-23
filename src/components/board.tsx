@@ -105,7 +105,10 @@ function FreeCell({ win }: { win: boolean }) {
 
 function BoardFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-papel/5 p-1.5 ring-1 ring-papel/10 sm:p-3">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="rounded-2xl bg-papel/5 p-1.5 ring-1 ring-papel/10 select-none [-webkit-touch-callout:none] [-webkit-user-select:none] sm:p-3"
+    >
       <div className="mb-1.5 grid grid-cols-5 gap-1.5 sm:mb-2 sm:gap-2">
         {"BINGO".split("").map((l, i) => (
           <span
@@ -174,11 +177,14 @@ type BuildProps = {
   /** Empty square picked by tapping: the next phrase goes there. */
   target?: number | null
   onTarget?: (slot: number) => void
+  /** Filled square picked by tapping: the next square tapped swaps with it. */
+  moving?: number | null
+  onPick?: (slot: number) => void
   said?: Set<string>
 }
 
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear, target, onTarget, said }: BuildProps) {
+export function BuildBoard({ slots, onClear, target, onTarget, moving, onPick, said }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
@@ -192,6 +198,8 @@ export function BuildBoard({ slots, onClear, target, onTarget, said }: BuildProp
             onClear={onClear}
             target={target}
             onTarget={onTarget}
+            moving={moving}
+            onPick={onPick}
             said={said}
           />
         )
@@ -206,6 +214,8 @@ function BuildSlot({
   onClear,
   target,
   onTarget,
+  moving,
+  onPick,
   said,
 }: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
   const slot = boardToSlot(index)
@@ -221,13 +231,19 @@ function BuildSlot({
   return (
     <div
       ref={setDropRef}
-      className={cn("relative aspect-square rounded-lg transition-transform", isOver && "scale-105 ring-4 ring-amarelo")}
+      className={cn(
+        "relative aspect-square rounded-lg transition-transform",
+        isOver && "scale-105 ring-4 ring-amarelo",
+        moving === slot && "z-10 scale-105 rounded-xl ring-4 ring-amarelo",
+        moving != null && moving !== slot && "animate-pulse"
+      )}
     >
       {cell ? (
         <div
           ref={setDragRef}
           {...listeners}
           {...attributes}
+          onClick={() => onPick?.(slot)}
           className={cn(
             "size-full cursor-grab rounded-lg active:cursor-grabbing",
             isDragging && "opacity-30"
@@ -243,8 +259,12 @@ function BuildSlot({
             type="button"
             aria-label="Tirar"
             onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => onClear(slot)}
-            className="absolute top-0.5 right-0.5 z-20 rounded bg-noite/70 p-0.5 text-papel hover:bg-noite"
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClear(slot)
+            }}
+            className="absolute top-0 right-0 z-20 rounded-bl-lg rounded-tr-lg bg-noite/70 p-1 text-papel hover:bg-noite"
           >
             <X className="size-3" />
           </button>

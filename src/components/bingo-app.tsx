@@ -82,11 +82,16 @@ export function BingoApp() {
 
   const p = progress(card.slots)
   return (
-    <div className="flex flex-col gap-6 pb-24">
+    <div className="flex min-w-0 flex-col gap-6 pb-24">
       <StatusBar locked={live.locked} msToLock={live.msToLock} />
 
       {live.locked ? (
-        <PlayView card={card} said={live.said} events={live.events} onChange={setCard} />
+        // The fill-on-lock effect runs right after this render; never draw a card with gaps.
+        incomplete ? (
+          <div className="mx-auto aspect-square w-full max-w-xl animate-pulse rounded-2xl bg-card" />
+        ) : (
+          <PlayView card={card} said={live.said} events={live.events} onChange={setCard} />
+        )
       ) : (
         <>
           {/* Before 21h20 the feed already scores the card, so the admin can be tested live. */}
@@ -153,7 +158,15 @@ function ShareButton({
   hint: string | null
 }) {
   const [copied, setCopied] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [fallback, setFallback] = useState<string | null>(null)
+
   const share = async () => {
+    if (disabled) {
+      setNotice(`Falta completar a cartela (${hint}). Toque nas frases ou em “Completar”.`)
+      setTimeout(() => setNotice(null), 3000)
+      return
+    }
     const url = `${window.location.origin}/?c=${encodeCard(card)}`
     const pts = score(marksFor(card.slots, card.marked, said)).points
     const text = said.size
@@ -164,21 +177,52 @@ function ShareButton({
         await navigator.share({ text, url })
         return
       }
+    } catch (e) {
+      // User closed the share sheet: nothing to do.
+      if (e instanceof DOMException && e.name === "AbortError") return
+    }
+    try {
       await navigator.clipboard.writeText(`${text} ${url}`)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch {
+      // In-app browsers (Instagram, WhatsApp) may block both: show the link to copy by hand.
+      setFallback(url)
+    }
   }
+
   return (
-    <Button
-      size="lg"
-      className="h-11 rounded-xl px-4 font-display text-base tracking-wider uppercase"
-      onClick={share}
-      disabled={disabled}
-    >
-      {copied ? <Check /> : <Share2 />} {copied ? "Copiado" : "Mandar"}
-      {hint && <span className="text-xs tabular-nums opacity-70">{hint}</span>}
-    </Button>
+    <>
+      {(notice || fallback) && (
+        <div className="absolute inset-x-3 bottom-full mb-2 mx-auto max-w-xl rounded-xl bg-card p-3 text-sm shadow-xl ring-1 ring-border">
+          {notice ?? (
+            <div className="flex flex-col gap-2">
+              <span>Copie o link e mande:</span>
+              <input
+                readOnly
+                value={fallback ?? ""}
+                onFocus={(e) => e.currentTarget.select()}
+                className="h-10 rounded-lg border bg-background px-2 text-base"
+              />
+              <button type="button" className="self-end text-xs text-muted-foreground underline" onClick={() => setFallback(null)}>
+                fechar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <Button
+        size="lg"
+        className={cn(
+          "h-11 rounded-xl px-4 font-display text-base tracking-wider uppercase",
+          disabled && "opacity-60"
+        )}
+        onClick={share}
+      >
+        {copied ? <Check /> : <Share2 />} {copied ? "Copiado" : "Mandar"}
+        {hint && <span className="text-xs tabular-nums opacity-70">{hint}</span>}
+      </Button>
+    </>
   )
 }
 
@@ -215,7 +259,7 @@ function PlayView({
     })
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
       <div className="flex flex-col gap-3">
         <ScoreBanner marked={marked} misses={tally(card.slots, said).misses} />
         <PlayBoard slots={card.slots as Cell[]} marked={marked} said={said} onToggle={toggle} />

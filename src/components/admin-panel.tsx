@@ -113,7 +113,7 @@ export function AdminPanel() {
   const freeText = query.trim() && !POOL.some((t) => normalize(t) === q) ? query.trim().slice(0, 40) : null
 
   return (
-    <div className="grid gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] md:items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] md:items-start">
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
           Toque em quem falou. Aparece pra todo mundo em ~5s e marca as cartelas de quem apostou nele. &quot;Ambos&quot;

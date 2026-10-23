@@ -116,11 +116,17 @@
   body {
     /* sem fundo próprio: o html pinta a cor e o ::before fixo pinta o brilho */
     @apply text-foreground;
+    /* nada pode empurrar a página pro lado no celular */
+    overflow-x: clip;
   }
   html {
     @apply font-sans;
     background: var(--noite);
     color-scheme: dark;
+    /* no double-tap zoom: people tap phrases quickly one after another */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 }
 @layer components {
