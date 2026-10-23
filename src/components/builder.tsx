@@ -13,7 +13,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { Dices, Eraser, PenLine, Plus, Search } from "lucide-react"
+import { Dices, Eraser, Search } from "lucide-react"
 
 import { BuildBoard, CellFace } from "@/components/board"
 import { Flag, Star } from "@/components/star"
@@ -22,12 +22,10 @@ import { cn } from "@/lib/utils"
 import { POOL, type Speaker } from "@/lib/phrases"
 import {
   type Cell,
-  CUSTOM_REQUIRED,
-  LIST_MAX,
   type Slots,
   SLOTS,
   emptySlots,
-  fillFromList,
+  fillEmpty,
   normalize,
   progress,
   slotToBoard,
@@ -41,7 +39,6 @@ type Props = {
 
 export function Builder({ slots, onChange }: Props) {
   const [dragging, setDragging] = useState<Cell | null>(null)
-  const [custom, setCustom] = useState("")
   const [side, setSide] = useState<Speaker>("lula")
   const [target, setTarget] = useState<number | null>(null)
   const [nope, setNope] = useState(false)
@@ -53,8 +50,7 @@ export function Builder({ slots, onChange }: Props) {
 
   const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
   const p = progress(slots)
-  const listFull = p.list >= LIST_MAX || p.filled >= SLOTS
-  const customFull = p.custom >= CUSTOM_REQUIRED || p.filled >= SLOTS
+  const full = p.filled >= SLOTS
   const freeOf = (s: Speaker) => slots.filter((c, i) => !c && speakerAt(slotToBoard(i)) === s).length
 
   // Tapping: goes to the picked square, else the next free square of the chosen color.
@@ -101,16 +97,7 @@ export function Builder({ slots, onChange }: Props) {
       onChange(next)
       return
     }
-    // Dropping a list phrase onto a filled slot replaces it, so the list cap still holds.
-    const replacing = slots[to]
-    if (listFull && !(replacing && !replacing.custom)) return
     onChange(slots.map((c, i) => (i === to ? cell : c)))
-  }
-
-  const addCustom = () => {
-    const text = custom.trim().slice(0, 40)
-    if (!text || customFull) return
-    if (put({ text, custom: true })) setCustom("")
   }
 
   return (
@@ -135,7 +122,7 @@ export function Builder({ slots, onChange }: Props) {
                   <Eraser /> <span className="hidden sm:inline">Limpar</span>
                 </Button>
               )}
-              <Button variant="secondary" size="sm" onClick={() => onChange(fillFromList(slots))} disabled={listFull}>
+              <Button variant="secondary" size="sm" onClick={() => onChange(fillEmpty(slots))} disabled={full}>
                 <Dices /> Completar
               </Button>
             </div>
@@ -143,7 +130,6 @@ export function Builder({ slots, onChange }: Props) {
           <BuildBoard
             slots={slots}
             onClear={clear}
-            ownOnly={p.list >= LIST_MAX}
             target={target}
             onTarget={pickTarget}
           />
@@ -162,41 +148,8 @@ export function Builder({ slots, onChange }: Props) {
             target={target !== null}
           />
 
-          <section className="flex flex-col gap-3 rounded-2xl bg-amarelo/10 p-4 ring-2 ring-amarelo/50">
-            <h3 className="flex items-center gap-2 font-display text-lg tracking-widest uppercase">
-              <PenLine className="size-4 text-amarelo" /> Suas frases
-              <span
-                className={cn(
-                  "ml-auto tabular-nums",
-                  p.custom >= CUSTOM_REQUIRED ? "text-amarelo" : "text-muted-foreground"
-                )}
-              >
-                {p.custom}/{CUSTOM_REQUIRED}
-              </span>
-            </h3>
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault()
-                addCustom()
-              }}
-            >
-              <input
-                value={custom}
-                onChange={(e) => setCustom(e.target.value)}
-                placeholder={customFull ? "Já tem as 5 ✓" : "Escreve uma (obrigatório 5)"}
-                maxLength={40}
-                disabled={customFull}
-                enterKeyHint="done"
-                className="h-11 min-w-0 flex-1 rounded-xl border bg-background/60 px-3 font-display tracking-wide uppercase outline-none placeholder:normal-case placeholder:font-sans placeholder:tracking-normal placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-              />
-              <Button type="submit" size="lg" className="h-11 rounded-xl" disabled={customFull || !custom.trim()}>
-                <Plus /> Pôr
-              </Button>
-            </form>
-          </section>
 
-          <Pool used={used} disabled={listFull} onPick={put} />
+          <Pool used={used} disabled={full} onPick={put} />
         </div>
       </div>
 
@@ -257,37 +210,13 @@ function SidePicker({
   )
 }
 
-function Checklist({ list, custom, complete }: ReturnType<typeof progress>) {
-  if (complete) {
-    return (
-      <p className="text-center font-display tracking-wider text-amarelo uppercase">
-        Cartela pronta! Manda pra galera 👇
-      </p>
-    )
-  }
-  const items = [
-    { ok: list >= LIST_MAX, text: `${list}/${LIST_MAX} da lista` },
-    { ok: custom >= CUSTOM_REQUIRED, text: `${custom}/${CUSTOM_REQUIRED} suas` },
-  ]
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="flex flex-wrap justify-center gap-1.5">
-        {items.map((i) => (
-          <span
-            key={i.text}
-            className={cn(
-              "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-              i.ok ? "bg-verde/20 text-verde" : "bg-amarelo/15 text-amarelo"
-            )}
-          >
-            {i.ok ? "✓" : "•"} {i.text}
-          </span>
-        ))}
-      </div>
-      <p className="hidden text-center text-xs text-muted-foreground sm:block">
-        Arraste as frases pra cartela · arraste dentro pra trocar de lado · × tira
-      </p>
-    </div>
+function Checklist({ complete }: ReturnType<typeof progress>) {
+  return complete ? (
+    <p className="text-center font-display tracking-wider text-amarelo uppercase">Cartela pronta! Manda pra galera 👇</p>
+  ) : (
+    <p className="hidden text-center text-xs text-muted-foreground sm:block">
+      Arraste as frases pra cartela · arraste dentro pra trocar de lado · × tira
+    </p>
   )
 }
 
@@ -317,11 +246,6 @@ function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean
           />
         </label>
       </div>
-      {disabled && (
-        <p className="rounded-lg bg-amarelo/10 px-3 py-2 text-sm text-amarelo">
-          Já tem as {LIST_MAX} da lista. Os quadrados que sobraram são pras suas frases.
-        </p>
-      )}
       <div className="-mx-1 flex max-h-[45vh] flex-wrap content-start gap-1.5 overflow-y-auto px-1 pb-1 lg:max-h-[60vh]">
         {items.map((text) => (
           <PoolChip key={text} text={text} disabled={disabled} onPick={onPick} />

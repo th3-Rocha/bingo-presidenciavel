@@ -1,7 +1,7 @@
 "use client"
 
 import { useDraggable, useDroppable } from "@dnd-kit/core"
-import { Check, PenLine, X } from "lucide-react"
+import { Check, X } from "lucide-react"
 
 import { Flag, Star } from "@/components/star"
 import { cn } from "@/lib/utils"
@@ -43,9 +43,6 @@ export function CellFace({
         <Star className="pointer-events-none absolute -right-2 -bottom-2 size-10 text-papel/15 sm:size-14" />
       ) : (
         <Flag className="pointer-events-none absolute -right-3 -bottom-2 w-14 -rotate-12 text-papel/15 sm:w-20" />
-      )}
-      {cell.custom && (
-        <PenLine className="pointer-events-none absolute bottom-1 left-1 size-2.5 opacity-60 sm:size-3" />
       )}
       {marked && (
         <span className="stamp pointer-events-none absolute inset-[8%] rounded-full bg-amarelo/90 shadow-lg" />
@@ -149,15 +146,13 @@ export function PlayBoard({
 type BuildProps = {
   slots: Slots
   onClear: (slot: number) => void
-  /** Once the list quota is used up, empty squares can only take the player's own phrases. */
-  ownOnly?: boolean
   /** Empty square picked by tapping: the next phrase goes there. */
   target?: number | null
   onTarget?: (slot: number) => void
 }
 
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear, ownOnly, target, onTarget }: BuildProps) {
+export function BuildBoard({ slots, onClear, target, onTarget }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
@@ -169,7 +164,6 @@ export function BuildBoard({ slots, onClear, ownOnly, target, onTarget }: BuildP
             index={i}
             cell={slots[boardToSlot(i)]}
             onClear={onClear}
-            ownOnly={ownOnly}
             target={target}
             onTarget={onTarget}
           />
@@ -183,7 +177,6 @@ function BuildSlot({
   index,
   cell,
   onClear,
-  ownOnly,
   target,
   onTarget,
 }: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
@@ -232,18 +225,10 @@ function BuildSlot({
           className={cn(
             "flex size-full flex-col items-center justify-center rounded-lg border-2 border-dashed font-display transition-colors",
             tone === "pt" ? "border-pt/60 bg-pt/10 text-pt/70" : "border-verde/60 bg-verde/10 text-verde/70",
-            ownOnly && "border-amarelo/70 text-amarelo",
             target === slot && (tone === "pt" ? "border-solid bg-pt/45 text-papel" : "border-solid bg-verde/45 text-papel")
           )}
         >
-          {ownOnly ? (
-            <>
-              <PenLine className="size-4 sm:size-5" />
-              <span className="text-[0.55rem] tracking-widest sm:text-xs">SUA</span>
-            </>
-          ) : (
-            <span className="text-xl">+</span>
-          )}
+          <span className="text-xl">+</span>
         </button>
       )}
     </div>

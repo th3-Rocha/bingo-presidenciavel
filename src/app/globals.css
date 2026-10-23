@@ -114,18 +114,29 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    /* sem fundo próprio: o html pinta a cor e o ::before fixo pinta o brilho */
+    @apply text-foreground;
   }
   html {
     @apply font-sans;
+    background: var(--noite);
+    color-scheme: dark;
   }
 }
 @layer components {
-  /* fundo com brilho verde/vermelho nas bordas */
-  .bg-debate {
+  /* Fundo fixo na tela inteira: brilho vermelho (esq.) e verde (dir.) + xadrez sutil.
+     Fica num ::before fixo pra não "acabar" no meio da página nem pular no celular. */
+  .bg-debate::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background:
-      radial-gradient(60rem 30rem at 0% 0%, oklch(0.55 0.22 27 / 0.22), transparent 60%),
-      radial-gradient(60rem 30rem at 100% 0%, oklch(0.58 0.15 152 / 0.22), transparent 60%),
+      radial-gradient(ellipse 70% 55% at -10% 30%, oklch(0.55 0.22 27 / 0.28), transparent 70%),
+      radial-gradient(ellipse 70% 55% at 110% 70%, oklch(0.58 0.15 152 / 0.26), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 50% 0%, oklch(0.9 0.18 98 / 0.07), transparent 70%),
+      repeating-conic-gradient(oklch(1 0 0 / 0.025) 0 25%, transparent 0 50%) 0 0 / 48px 48px,
       var(--noite);
   }
   /* faixa xadrez vermelho × verde */

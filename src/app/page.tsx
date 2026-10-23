@@ -2,7 +2,7 @@ import { BingoApp } from "@/components/bingo-app"
 import { Flag, Star } from "@/components/star"
 
 const STEPS = [
-  { n: "1", title: "Monte", text: "19 frases da lista + 5 suas. Vermelho é aposta no Lula, verde no Flávio." },
+  { n: "1", title: "Monte", text: "24 frases. Vermelho é aposta que o Lula fala, verde que o Flávio fala." },
   { n: "2", title: "Mande", text: "Compartilhe a cartela com a galera antes das 21h20, quando tudo trava." },
   { n: "3", title: "Marque", text: "Durante o debate o que sair marca sozinho. Fechou linha, BINGO." },
 ]

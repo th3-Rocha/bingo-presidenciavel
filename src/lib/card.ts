@@ -3,10 +3,8 @@ import { POOL, type Speaker } from "./phrases"
 export const SIZE = 5
 export const CENTER = 12
 export const SLOTS = SIZE * SIZE - 1
-export const CUSTOM_REQUIRED = 5
-export const LIST_MAX = SLOTS - CUSTOM_REQUIRED
 
-export type Cell = { text: string; custom?: boolean }
+export type Cell = { text: string }
 export type Slots = (Cell | null)[] // SLOTS entries; the free center is not stored
 
 export type Card = {
@@ -36,13 +34,7 @@ export const emptySlots = (): Slots => Array(SLOTS).fill(null)
 
 export function progress(slots: Slots) {
   const cells = slots.filter((c): c is Cell => !!c)
-  const custom = cells.filter((c) => c.custom).length
-  return {
-    filled: cells.length,
-    custom,
-    list: cells.length - custom,
-    complete: cells.length === SLOTS && custom >= CUSTOM_REQUIRED,
-  }
+  return { filled: cells.length, complete: cells.length === SLOTS }
 }
 
 export function score(marked: Set<number>) {
@@ -76,20 +68,7 @@ export function shuffle<T>(items: T[]): T[] {
   return out
 }
 
-// "Completar": fills list slots only, leaving room for the player's own phrases.
-export function fillFromList(slots: Slots): Slots {
-  const { filled, custom } = progress(slots)
-  const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
-  const extra = shuffle(POOL.filter((t) => !used.has(normalize(t))))
-  const room = SLOTS - filled - Math.max(0, CUSTOM_REQUIRED - custom)
-  // Pick which gaps get filled at random, so the spots left for the player's own
-  // phrases are spread over the card instead of always being the bottom row.
-  const gaps = shuffle(slots.flatMap((c, i) => (c ? [] : [i])))
-  const toFill = new Set(gaps.slice(0, Math.max(0, room)))
-  return slots.map((c, i) => c ?? (toFill.has(i) ? { text: extra.pop()! } : null))
-}
-
-// At lock time everyone gets a full, fully assigned card.
+// "Completar" and the 21h20 lock both fill every gap with random phrases.
 export function fillEmpty(slots: Slots): Cell[] {
   const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
   const extra = shuffle(POOL.filter((t) => !used.has(normalize(t))))
@@ -101,7 +80,7 @@ export function encodeCard(card: Pick<Card, "name" | "slots">) {
   const payload = {
     n: card.name,
     c: card.slots.map((c) =>
-      c ? [c.text, c.custom ? 1 : 0] : 0
+      c ? [c.text] : 0
     ),
   }
   const bytes = new TextEncoder().encode(JSON.stringify(payload))
@@ -114,14 +93,14 @@ export function decodeCard(raw: string): Pick<Card, "name" | "slots"> | null {
     const bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))
     const payload = JSON.parse(new TextDecoder().decode(bytes)) as {
       n: string
-      c: ([string, number?] | 0)[]
+      c: ([string] | 0)[]
     }
     if (!Array.isArray(payload.c) || payload.c.length !== SLOTS) return null
     return {
       name: String(payload.n ?? "").slice(0, 30),
       slots: payload.c.map((c) =>
         Array.isArray(c)
-          ? { text: String(c[0]).slice(0, 40), custom: c[1] === 1 }
+          ? { text: String(c[0]).slice(0, 40) }
           : null
       ),
     }
@@ -130,7 +109,7 @@ export function decodeCard(raw: string): Pick<Card, "name" | "slots"> | null {
   }
 }
 
-const STORAGE_KEY = "bingo-debate-card-v5"
+const STORAGE_KEY = "bingo-debate-card-v6"
 
 export function loadCard(): Card | null {
   try {
