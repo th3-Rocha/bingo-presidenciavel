@@ -13,42 +13,52 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { Dices, Eraser, Plus } from "lucide-react"
+import { Dices, Eraser, PenLine, Plus } from "lucide-react"
 
 import { BuildBoard, CellFace } from "@/components/board"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { POOL, SPEAKERS, type Speaker } from "@/lib/phrases"
-import { type Cell, type Slots, SLOTS, emptySlots, fillEmpty } from "@/lib/card"
+import { POOL, type Speaker } from "@/lib/phrases"
+import {
+  type Cell,
+  CUSTOM_REQUIRED,
+  LIST_MAX,
+  type Slots,
+  SLOTS,
+  emptySlots,
+  fillFromList,
+  normalize,
+  progress,
+} from "@/lib/card"
 
 type Props = {
   slots: Slots
   onChange: (slots: Slots) => void
 }
 
-const dot: Record<Speaker, string> = { lula: "bg-pt", flavio: "bg-verde", geral: "bg-amarelo" }
-
 export function Builder({ slots, onChange }: Props) {
   const [dragging, setDragging] = useState<Cell | null>(null)
   const [custom, setCustom] = useState("")
-  const [customSpeaker, setCustomSpeaker] = useState<Speaker>("geral")
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } })
   )
 
-  const used = new Set(slots.flatMap((c) => (c ? [c.text.toLowerCase()] : [])))
-  const filled = slots.filter(Boolean).length
-  const full = filled === SLOTS
+  const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
+  const p = progress(slots)
+  const listFull = p.list >= LIST_MAX || p.filled >= SLOTS
+  const customFull = p.custom >= CUSTOM_REQUIRED || p.filled >= SLOTS
 
-  const put = (cell: Cell) => {
-    const free = slots.indexOf(null)
-    if (free === -1 || used.has(cell.text.toLowerCase())) return
-    onChange(slots.map((c, i) => (i === free ? cell : c)))
+  const put = (cell: Cell, at?: number) => {
+    const target = at ?? slots.indexOf(null)
+    if (target === -1 || used.has(normalize(cell.text))) return
+    onChange(slots.map((c, i) => (i === target ? cell : c)))
   }
 
   const clear = (slot: number) => onChange(slots.map((c, i) => (i === slot ? null : c)))
+  const assign = (slot: number, speaker: Speaker) =>
+    onChange(slots.map((c, i) => (i === slot && c ? { ...c, speaker } : c)))
 
   const onDragStart = (e: DragStartEvent) => setDragging((e.active.data.current?.cell as Cell) ?? null)
 
@@ -64,87 +74,102 @@ export function Builder({ slots, onChange }: Props) {
       return
     }
     const to = Number(target.slice(5))
-    const next = [...slots]
     if (from !== null) {
+      const next = [...slots]
       ;[next[from], next[to]] = [next[to], next[from]]
-    } else {
-      next[to] = cell
+      onChange(next)
+      return
     }
-    onChange(next)
+    // Dropping a list phrase onto a filled slot replaces it, so the list cap still holds.
+    const replacing = slots[to]
+    if (listFull && !(replacing && !replacing.custom)) return
+    onChange(slots.map((c, i) => (i === to ? cell : c)))
   }
 
   const addCustom = () => {
     const text = custom.trim().slice(0, 40)
-    if (!text || full) return
-    put({ text, speaker: customSpeaker })
+    if (!text || customFull || used.has(normalize(text))) return
+    put({ text, speaker: null, custom: true })
     setCustom("")
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => setDragging(null)}
+    >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
         <div className="flex flex-col gap-3 lg:sticky lg:top-4">
           <div className="flex items-center justify-between gap-2">
             <span className="font-display text-xl tracking-wide uppercase">
               Sua cartela{" "}
-              <span className={cn("tabular-nums", full ? "text-amarelo" : "text-muted-foreground")}>
-                {filled}/{SLOTS}
+              <span className={cn("tabular-nums", p.complete ? "text-amarelo" : "text-muted-foreground")}>
+                {p.filled}/{SLOTS}
               </span>
             </span>
             <div className="flex gap-1.5">
-              {filled > 0 && (
+              {p.filled > 0 && (
                 <Button variant="ghost" size="sm" onClick={() => onChange(emptySlots())}>
                   <Eraser /> Limpar
                 </Button>
               )}
-              <Button variant="secondary" size="sm" onClick={() => onChange(fillEmpty(slots))} disabled={full}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onChange(fillFromList(slots))}
+                disabled={listFull && p.unassigned === 0}
+              >
                 <Dices /> Completar
               </Button>
             </div>
           </div>
-          <BuildBoard slots={slots} onClear={clear} />
-          <p className="text-center text-xs text-muted-foreground">
-            Arraste as palavras pra cartela · arraste dentro dela pra trocar de lugar · toque pra tirar
-          </p>
+          <BuildBoard slots={slots} onClear={clear} onAssign={assign} />
+          <Checklist {...p} />
         </div>
 
-        <Pool used={used} full={full} onPick={put}>
-          <form
-            className="flex flex-wrap gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              addCustom()
-            }}
-          >
-            <input
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-              placeholder="Escreve a sua…"
-              maxLength={40}
-              className="h-9 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-            />
-            <select
-              value={customSpeaker}
-              onChange={(e) => setCustomSpeaker(e.target.value as Speaker)}
-              className="h-9 rounded-lg border bg-background px-2 text-sm"
+        <div className="flex flex-col gap-4">
+          <section className="flex flex-col gap-3 rounded-2xl bg-amarelo/10 p-4 ring-2 ring-amarelo/60">
+            <h3 className="flex items-center gap-2 font-display text-lg tracking-widest uppercase">
+              <PenLine className="size-4 text-amarelo" /> Tem uma melhor?
+              <span className={cn("ml-auto tabular-nums", p.custom >= CUSTOM_REQUIRED ? "text-amarelo" : "text-muted-foreground")}>
+                {p.custom}/{CUSTOM_REQUIRED}
+              </span>
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Escreva <strong className="text-papel">{CUSTOM_REQUIRED} frases suas</strong>, obrigatório. Depois escolha
+              na cartela quem vai falar.
+            </p>
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                addCustom()
+              }}
             >
-              {(Object.keys(SPEAKERS) as Speaker[]).map((s) => (
-                <option key={s} value={s}>
-                  {SPEAKERS[s].label}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" size="lg" disabled={full || !custom.trim()}>
-              <Plus /> Pôr
-            </Button>
-          </form>
-        </Pool>
+              <input
+                value={custom}
+                onChange={(e) => setCustom(e.target.value)}
+                placeholder="Ex.: Faz o L"
+                maxLength={40}
+                disabled={customFull}
+                className="h-10 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 font-display tracking-wide uppercase outline-none placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+              />
+              <Button type="submit" size="lg" className="h-10" disabled={customFull || !custom.trim()}>
+                <Plus /> Pôr
+              </Button>
+            </form>
+          </section>
+
+          <Pool used={used} disabled={listFull} onPick={(cell) => put(cell)} />
+        </div>
       </div>
 
       <DragOverlay dropAnimation={null}>
         {dragging && (
           <div className="size-20 rotate-3 drop-shadow-2xl sm:size-28">
-            <CellFace cell={dragging} tone={dragging.speaker === "flavio" ? "verde" : "pt"} />
+            <CellFace cell={dragging} tone="pt" />
           </div>
         )}
       </DragOverlay>
@@ -152,54 +177,65 @@ export function Builder({ slots, onChange }: Props) {
   )
 }
 
-function Pool({
-  used,
-  full,
-  onPick,
-  children,
-}: {
-  used: Set<string>
-  full: boolean
-  onPick: (cell: Cell) => void
-  children: React.ReactNode
-}) {
+function Checklist({ list, custom, unassigned, complete }: ReturnType<typeof progress>) {
+  if (complete) {
+    return (
+      <p className="text-center font-display tracking-wider text-amarelo uppercase">
+        Cartela pronta! Manda pra galera 👇
+      </p>
+    )
+  }
+  const items = [
+    { ok: list >= LIST_MAX, text: `${list}/${LIST_MAX} da lista` },
+    { ok: custom >= CUSTOM_REQUIRED, text: `${custom}/${CUSTOM_REQUIRED} suas` },
+    { ok: unassigned === 0, text: unassigned ? `${unassigned} sem candidato` : "todas com candidato" },
+  ]
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-wrap justify-center gap-1.5">
+        {items.map((i) => (
+          <span
+            key={i.text}
+            className={cn(
+              "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+              i.ok ? "bg-verde/20 text-verde" : "bg-amarelo/15 text-amarelo"
+            )}
+          >
+            {i.ok ? "✓" : "•"} {i.text}
+          </span>
+        ))}
+      </div>
+      <p className="text-center text-xs text-muted-foreground">
+        Arraste pra cartela · arraste dentro pra trocar · embaixo de cada uma escolha Lula ou Flávio
+      </p>
+    </div>
+  )
+}
+
+function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean; onPick: (cell: Cell) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: "pool" })
   return (
     <section
       ref={setNodeRef}
       className={cn(
-        "flex flex-col gap-5 rounded-2xl bg-card/60 p-4 ring-1 ring-border transition-colors",
-        isOver && "ring-2 ring-pt bg-pt/10"
+        "flex flex-col gap-3 rounded-2xl bg-card/60 p-4 ring-1 ring-border transition-colors",
+        isOver && "bg-pt/10 ring-2 ring-pt"
       )}
     >
-      {(Object.keys(POOL) as Speaker[]).map((speaker) => (
-        <div key={speaker} className="flex flex-col gap-2">
-          <h3 className="flex items-center gap-2 font-display text-sm tracking-widest text-muted-foreground uppercase">
-            <span className={cn("size-2.5 rounded-full", dot[speaker])} />
-            {speaker === "geral" ? "Qualquer um / mediação" : `${SPEAKERS[speaker].label} vai falar`}
-          </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {POOL[speaker]
-              .filter((text) => !used.has(text.toLowerCase()))
-              .map((text) => (
-                <PoolChip key={text} cell={{ text, speaker }} disabled={full} onPick={onPick} />
-              ))}
-          </div>
-        </div>
-      ))}
-      <div className="flex flex-col gap-2 border-t border-border pt-4">
-        <h3 className="font-display text-sm tracking-widest text-muted-foreground uppercase">
-          Tem uma melhor?
-        </h3>
-        {children}
+      <h3 className="font-display text-lg tracking-widest uppercase">Frases</h3>
+      <div className="flex flex-wrap gap-1.5">
+        {POOL.filter((text) => !used.has(normalize(text))).map((text) => (
+          <PoolChip key={text} text={text} disabled={disabled} onPick={onPick} />
+        ))}
       </div>
     </section>
   )
 }
 
-function PoolChip({ cell, disabled, onPick }: { cell: Cell; disabled: boolean; onPick: (cell: Cell) => void }) {
+function PoolChip({ text, disabled, onPick }: { text: string; disabled: boolean; onPick: (cell: Cell) => void }) {
+  const cell: Cell = { text, speaker: null }
   const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
-    id: `pool:${cell.text}`,
+    id: `pool:${text}`,
     data: { cell },
     disabled,
   })
@@ -212,13 +248,11 @@ function PoolChip({ cell, disabled, onPick }: { cell: Cell; disabled: boolean; o
       onClick={() => onPick(cell)}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 font-display text-sm tracking-wide uppercase transition-all select-none hover:-translate-y-0.5 hover:border-amarelo disabled:opacity-40",
-        "cursor-grab active:cursor-grabbing",
+        "cursor-grab rounded-full border border-border bg-secondary px-3 py-1.5 font-display text-sm tracking-wide uppercase transition-all select-none hover:-translate-y-0.5 hover:border-amarelo active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40",
         isDragging && "opacity-30"
       )}
     >
-      <span className={cn("size-2 rounded-full", dot[cell.speaker])} />
-      {cell.text}
+      {text}
     </button>
   )
 }

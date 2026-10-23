@@ -15,8 +15,8 @@ export default function Home() {
             <span className="text-verde">Debate</span>
           </h1>
           <p className="max-w-xl text-balance text-muted-foreground">
-            <strong className="text-papel">Lula × Flávio.</strong> Arraste 24 palavras que você acha que vão sair,
-            mande pra galera e marque ao vivo. Às 21h20 as cartelas travam.
+            <strong className="text-papel">Lula × Flávio.</strong> Monte a cartela com 19 frases da lista + 5 suas e
+            aposte quem vai falar cada uma. Às 21h20 as cartelas travam e é só marcar.
           </p>
         </header>
         <BingoApp />

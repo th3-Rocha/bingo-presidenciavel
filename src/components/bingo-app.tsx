@@ -19,9 +19,10 @@ import {
   decodeCard,
   emptySlots,
   encodeCard,
+  cellSaid,
   fillEmpty,
   loadCard,
-  normalize,
+  progress,
   saveCard,
   score,
   slotToBoard,
@@ -31,7 +32,7 @@ type Shared = { name: string; slots: Slots }
 
 // Official events mark the card on their own; manual marks cover anything the feed missed.
 function marksFor(slots: Slots, manual: number[], said: Set<string>) {
-  const auto = slots.flatMap((c, s) => (c && said.has(normalize(c.text)) ? [slotToBoard(s)] : []))
+  const auto = slots.flatMap((c, s) => (c && cellSaid(c, said) ? [slotToBoard(s)] : []))
   return new Set([CENTER, ...manual, ...auto])
 }
 
@@ -90,7 +91,7 @@ export function BingoApp() {
           aria-label="Seu nome"
           className="h-10 min-w-0 flex-1 rounded-lg border bg-card/60 px-3 font-display text-lg tracking-wide uppercase outline-none placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        <ShareButton card={card} said={live.said} disabled={incomplete} />
+        <ShareButton card={card} said={live.said} disabled={!live.locked && !progress(card.slots).complete} />
       </div>
 
       {live.locked ? (
@@ -192,7 +193,6 @@ function PlayView({
   )
 }
 
-const dot = { lula: "bg-pt", flavio: "bg-verde", geral: "bg-amarelo" } as const
 
 function LiveFeed({ events }: { events: DebateEvent[] }) {
   return (
@@ -208,7 +208,14 @@ function LiveFeed({ events }: { events: DebateEvent[] }) {
           {[...events].reverse().map((e) => (
             <li key={e.id} className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2">
               <span className="font-mono text-xs text-muted-foreground">#{e.id}</span>
-              {e.speaker && <span className={cn("size-2 shrink-0 rounded-full", dot[e.speaker])} />}
+              <span
+                className={cn(
+                  "shrink-0 rounded px-1.5 font-display text-xs tracking-wider",
+                  e.speaker === "lula" ? "bg-pt" : e.speaker === "flavio" ? "bg-verde" : "bg-amarelo text-noite"
+                )}
+              >
+                {e.speaker === "lula" ? "LULA" : e.speaker === "flavio" ? "FLÁVIO" : "AMBOS"}
+              </span>
               <span className="font-display tracking-wide uppercase">{e.text}</span>
               <span className="ml-auto text-xs text-muted-foreground tabular-nums">
                 {new Date(e.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}

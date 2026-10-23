@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 
 import { LOCK_AT, POLL_MS } from "@/lib/config"
-import { normalize } from "@/lib/card"
+import { saidKey } from "@/lib/card"
 import type { DebateEvent } from "@/lib/events"
 
 // Polls the official feed and keeps a server-corrected clock, so the lock
@@ -40,7 +40,7 @@ export function useLive() {
 
   const serverNow = now + offset
   const ready = now > 0
-  const said = useMemo(() => new Set(events.map((e) => normalize(e.text))), [events])
+  const said = useMemo(() => new Set(events.map((e) => saidKey(e.text, e.speaker))), [events])
 
   return { events, said, ready, locked: ready && serverNow >= LOCK_AT, msToLock: Math.max(0, LOCK_AT - serverNow) }
 }

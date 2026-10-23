@@ -1,23 +1,28 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Undo2 } from "lucide-react"
+import { Search, Undo2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useLive } from "@/hooks/use-live"
 import { cn } from "@/lib/utils"
-import { normalize } from "@/lib/card"
-import { POOL, SPEAKERS, type Speaker } from "@/lib/phrases"
+import { normalize, saidKey } from "@/lib/card"
+import { POOL, type Speaker } from "@/lib/phrases"
 
 const TOKEN_KEY = "bingo-admin-token"
-const dot: Record<Speaker, string> = { lula: "bg-pt", flavio: "bg-verde", geral: "bg-amarelo" }
+
+type Who = Speaker | null
+const WHO: { who: Who; label: string; on: string }[] = [
+  { who: "lula", label: "Lula", on: "bg-pt text-papel" },
+  { who: "flavio", label: "Flávio", on: "bg-verde text-papel" },
+  { who: null, label: "Ambos", on: "bg-amarelo text-noite" },
+]
 
 export function AdminPanel() {
   const live = useLive()
   const [token, setToken] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
-  const [custom, setCustom] = useState("")
-  const [customSpeaker, setCustomSpeaker] = useState<Speaker>("geral")
+  const [query, setQuery] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,8 +57,8 @@ export function AdminPanel() {
     }
   }
 
-  const send = (text: string, speaker: Speaker | null) =>
-    call(text, { method: "POST", body: JSON.stringify({ text, speaker }) })
+  const send = (text: string, speaker: Who) =>
+    call(saidKey(text, speaker), { method: "POST", body: JSON.stringify({ text, speaker }) })
 
   const undo = (id: number) => call(`del:${id}`, { method: "DELETE", path: `/api/events?id=${id}` })
 
@@ -85,70 +90,34 @@ export function AdminPanel() {
     )
   }
 
+  const q = normalize(query)
+  const phrases = POOL.filter((t) => normalize(t).includes(q))
+  // Typed text that isn't in the list can still be sent: it matches players' own phrases.
+  const freeText = query.trim() && !POOL.some((t) => normalize(t) === q) ? query.trim().slice(0, 40) : null
+
   return (
     <div className="grid gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] md:items-start">
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          Toque quando sair. Aparece pra todo mundo em ~5s e marca as cartelas sozinho.
+          Toque em quem falou. Aparece pra todo mundo em ~5s e marca as cartelas de quem apostou nele. &quot;Ambos&quot;
+          vale pras duas apostas.
           {error && <span className="ml-2 font-semibold text-pt">{error}</span>}
         </p>
-        {(Object.keys(POOL) as Speaker[]).map((speaker) => (
-          <div key={speaker} className="flex flex-col gap-2">
-            <h3 className="flex items-center gap-2 font-display text-sm tracking-widest text-muted-foreground uppercase">
-              <span className={cn("size-2.5 rounded-full", dot[speaker])} /> {SPEAKERS[speaker].label}
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {POOL[speaker].map((text) => {
-                const done = live.said.has(normalize(text))
-                return (
-                  <button
-                    key={text}
-                    type="button"
-                    disabled={done || busy === text}
-                    onClick={() => send(text, speaker)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 font-display text-sm tracking-wide uppercase transition-colors",
-                      done ? "border-amarelo bg-amarelo text-noite" : "border-border bg-secondary hover:border-amarelo",
-                      busy === text && "animate-pulse"
-                    )}
-                  >
-                    {text}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-        <form
-          className="flex flex-wrap gap-2 border-t border-border pt-4"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            const text = custom.trim()
-            if (text && (await send(text, customSpeaker))) setCustom("")
-          }}
-        >
+        <label className="flex h-11 items-center gap-2 rounded-lg border bg-card px-3 focus-within:ring-3 focus-within:ring-ring/50">
+          <Search className="size-4 text-muted-foreground" />
           <input
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            placeholder="Outra fala (bate com as cartelas que escreveram igual)"
-            maxLength={40}
-            className="h-9 min-w-0 flex-1 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar ou digitar frase nova (pras frases que a galera escreveu)"
+            className="min-w-0 flex-1 bg-transparent outline-none"
           />
-          <select
-            value={customSpeaker}
-            onChange={(e) => setCustomSpeaker(e.target.value as Speaker)}
-            className="h-9 rounded-lg border bg-background px-2 text-sm"
-          >
-            {(Object.keys(SPEAKERS) as Speaker[]).map((s) => (
-              <option key={s} value={s}>
-                {SPEAKERS[s].label}
-              </option>
-            ))}
-          </select>
-          <Button type="submit" size="lg" disabled={!custom.trim()}>
-            <Plus /> Soltar
-          </Button>
-        </form>
+        </label>
+        <div className="flex flex-col gap-1">
+          {freeText && <PhraseRow text={freeText} said={live.said} busy={busy} onSend={send} isNew />}
+          {phrases.map((text) => (
+            <PhraseRow key={text} text={text} said={live.said} busy={busy} onSend={send} />
+          ))}
+        </div>
       </div>
 
       <section className="flex flex-col gap-2 rounded-2xl bg-card/60 p-4 ring-1 ring-border md:sticky md:top-4">
@@ -157,6 +126,9 @@ export function AdminPanel() {
           <div key={e.id} className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2">
             <span className="font-mono text-xs text-muted-foreground">#{e.id}</span>
             <span className="font-display tracking-wide uppercase">{e.text}</span>
+            <span className="text-xs text-muted-foreground">
+              {e.speaker === "lula" ? "Lula" : e.speaker === "flavio" ? "Flávio" : "Ambos"}
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -169,6 +141,49 @@ export function AdminPanel() {
           </div>
         ))}
       </section>
+    </div>
+  )
+}
+
+function PhraseRow({
+  text,
+  said,
+  busy,
+  onSend,
+  isNew,
+}: {
+  text: string
+  said: Set<string>
+  busy: string | null
+  onSend: (text: string, who: Who) => void
+  isNew?: boolean
+}) {
+  return (
+    <div className={cn("flex items-center gap-2 rounded-lg px-3 py-1.5", isNew ? "bg-amarelo/10 ring-1 ring-amarelo/50" : "bg-card/60")}>
+      <span className="min-w-0 flex-1 font-display tracking-wide uppercase">
+        {isNew && <span className="mr-1.5 text-xs text-amarelo">NOVA</span>}
+        {text}
+      </span>
+      {WHO.map(({ who, label, on }) => {
+        const key = saidKey(text, who)
+        const done = said.has(key)
+        return (
+          <button
+            key={label}
+            type="button"
+            disabled={done || busy === key}
+            onClick={() => onSend(text, who)}
+            className={cn(
+              "rounded-md border px-2.5 py-1 font-display text-xs tracking-wider uppercase transition-colors",
+              done ? cn(on, "border-transparent") : "border-border bg-secondary hover:border-amarelo",
+              busy === key && "animate-pulse"
+            )}
+          >
+            {done ? "✓ " : ""}
+            {label}
+          </button>
+        )
+      })}
     </div>
   )
 }

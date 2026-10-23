@@ -3,7 +3,8 @@ import { connection, type NextRequest } from "next/server"
 import { addEvent, listEvents, removeEvent } from "@/lib/events"
 import type { Speaker } from "@/lib/phrases"
 
-const SPEAKERS: Speaker[] = ["lula", "flavio", "geral"]
+// null speaker = "ambos", counts for whichever candidate the player picked
+const SPEAKERS: Speaker[] = ["lula", "flavio"]
 
 function authorized(req: NextRequest) {
   const expected = process.env.ADMIN_TOKEN

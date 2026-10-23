@@ -1,19 +1,32 @@
 "use client"
 
 import { useDraggable, useDroppable } from "@dnd-kit/core"
-import { Check } from "lucide-react"
+import { Check, PenLine, X } from "lucide-react"
 
 import { Star } from "@/components/star"
 import { cn } from "@/lib/utils"
-import { type Cell, CENTER, SIZE, type Slots, boardToSlot, normalize, score } from "@/lib/card"
+import { SPEAKERS, type Speaker } from "@/lib/phrases"
+import { type Cell, CENTER, SIZE, type Slots, boardToSlot, cellSaid, score } from "@/lib/card"
 
 type Tone = "pt" | "verde"
 
-const toneOf = (i: number): Tone => ((Math.floor(i / SIZE) + (i % SIZE)) % 2 === 0 ? "pt" : "verde")
+export const toneOf = (i: number): Tone => ((Math.floor(i / SIZE) + (i % SIZE)) % 2 === 0 ? "pt" : "verde")
 
 const toneBg: Record<Tone, string> = {
   pt: "bg-pt text-papel",
   verde: "bg-verde text-papel",
+}
+
+export const speakerDot: Record<Speaker, string> = { lula: "bg-pt", flavio: "bg-verde" }
+
+function SpeakerTag({ speaker }: { speaker: Speaker }) {
+  return (
+    <span className="absolute top-0.5 left-0.5 z-10 flex items-center gap-0.5 rounded bg-noite/85 px-1 font-display text-[0.5rem] leading-tight tracking-wider text-papel sm:text-[0.6rem]">
+      <span className={cn("size-1.5 rounded-full", speakerDot[speaker])} />
+      <span className="sm:hidden">{SPEAKERS[speaker].short}</span>
+      <span className="hidden sm:inline">{SPEAKERS[speaker].label}</span>
+    </span>
+  )
 }
 
 /** The tile itself: checkerboard color, decoration, text, dauber when marked. */
@@ -22,12 +35,14 @@ export function CellFace({
   tone,
   marked = false,
   saiu = false,
+  showSpeaker = true,
   className,
 }: {
   cell: Cell
   tone: Tone
   marked?: boolean
   saiu?: boolean
+  showSpeaker?: boolean
   className?: string
 }) {
   return (
@@ -46,19 +61,23 @@ export function CellFace({
           🇧🇷
         </span>
       )}
+      {cell.custom && (
+        <PenLine className="pointer-events-none absolute bottom-1 left-1 size-2.5 opacity-60 sm:size-3" />
+      )}
       {marked && (
         <span className="stamp pointer-events-none absolute inset-[8%] rounded-full bg-amarelo/90 shadow-lg" />
       )}
       <span
         className={cn(
-          "relative z-10 max-w-full font-display text-[0.62rem] leading-[1.05] hyphens-auto [overflow-wrap:anywhere] tracking-wide uppercase sm:text-sm md:text-base",
+          "relative z-10 max-w-full font-display text-[0.62rem] leading-[1.05] tracking-wide uppercase hyphens-auto [overflow-wrap:anywhere] sm:text-sm md:text-base",
           marked && "text-noite"
         )}
       >
         {cell.text}
       </span>
+      {showSpeaker && cell.speaker && <SpeakerTag speaker={cell.speaker} />}
       {saiu && (
-        <span className="absolute top-0.5 left-0.5 z-10 rounded bg-amarelo px-1 font-display text-[0.5rem] tracking-wider text-noite sm:text-[0.6rem]">
+        <span className="absolute top-0.5 right-0.5 z-10 rounded bg-amarelo px-1 font-display text-[0.5rem] tracking-wider text-noite sm:text-[0.6rem]">
           SAIU
         </span>
       )}
@@ -87,10 +106,7 @@ function BoardFrame({ children }: { children: React.ReactNode }) {
         {"BINGO".split("").map((l, i) => (
           <span
             key={l}
-            className={cn(
-              "text-center font-display text-2xl sm:text-4xl",
-              i % 2 === 0 ? "text-pt" : "text-verde"
-            )}
+            className={cn("text-center font-display text-2xl sm:text-4xl", i % 2 === 0 ? "text-pt" : "text-verde")}
           >
             {l}
           </span>
@@ -132,12 +148,7 @@ export function PlayBoard({
               winning.has(i) && "rounded-xl ring-4 ring-amarelo"
             )}
           >
-            <CellFace
-              cell={cell}
-              tone={toneOf(i)}
-              marked={marked.has(i)}
-              saiu={said.has(normalize(cell.text))}
-            />
+            <CellFace cell={cell} tone={toneOf(i)} marked={marked.has(i)} saiu={cellSaid(cell, said)} />
           </button>
         )
       })}
@@ -145,22 +156,33 @@ export function PlayBoard({
   )
 }
 
+type BuildProps = {
+  slots: Slots
+  onClear: (slot: number) => void
+  onAssign: (slot: number, speaker: Speaker) => void
+}
+
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear }: { slots: Slots; onClear: (slot: number) => void }) {
+export function BuildBoard({ slots, onClear, onAssign }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
         i === CENTER ? (
           <FreeCell key={i} win={false} />
         ) : (
-          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} />
+          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} onAssign={onAssign} />
         )
       )}
     </BoardFrame>
   )
 }
 
-function BuildSlot({ index, cell, onClear }: { index: number; cell: Cell | null; onClear: (slot: number) => void }) {
+function BuildSlot({
+  index,
+  cell,
+  onClear,
+  onAssign,
+}: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
   const slot = boardToSlot(index)
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `slot:${slot}` })
   const {
@@ -174,23 +196,50 @@ function BuildSlot({ index, cell, onClear }: { index: number; cell: Cell | null;
   return (
     <div
       ref={setDropRef}
-      className={cn(
-        "relative aspect-square rounded-lg transition-transform",
-        isOver && "scale-105 ring-4 ring-amarelo"
-      )}
+      className={cn("relative aspect-square rounded-lg transition-transform", isOver && "scale-105 ring-4 ring-amarelo")}
     >
       {cell ? (
-        <button
+        <div
           ref={setDragRef}
-          type="button"
           {...listeners}
           {...attributes}
-          onClick={() => onClear(slot)}
-          title="Arraste pra trocar de lugar · toque pra tirar"
-          className={cn("size-full cursor-grab active:cursor-grabbing", isDragging && "opacity-30")}
+          className={cn(
+            "size-full cursor-grab rounded-lg active:cursor-grabbing",
+            !cell.speaker && "ring-2 ring-amarelo ring-offset-1 ring-offset-noite",
+            isDragging && "opacity-30"
+          )}
         >
-          <CellFace cell={cell} tone={tone} />
-        </button>
+          <CellFace cell={cell} tone={tone} showSpeaker={false} className="pb-5 sm:pb-7" />
+          <button
+            type="button"
+            aria-label="Tirar"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onClear(slot)}
+            className="absolute top-0.5 right-0.5 z-20 rounded bg-noite/70 p-0.5 text-papel hover:bg-noite"
+          >
+            <X className="size-3" />
+          </button>
+          <div
+            className="absolute inset-x-0.5 bottom-0.5 z-20 grid grid-cols-2 gap-0.5"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {(Object.keys(SPEAKERS) as Speaker[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onAssign(slot, s)}
+                aria-pressed={cell.speaker === s}
+                className={cn(
+                  "rounded font-display text-[0.55rem] leading-4 tracking-wider transition-colors sm:text-xs sm:leading-5",
+                  cell.speaker === s ? "bg-papel text-noite" : "bg-noite/50 text-papel/80 hover:bg-noite/80"
+                )}
+              >
+                <span className="sm:hidden">{SPEAKERS[s].short}</span>
+                <span className="hidden sm:inline">{SPEAKERS[s].label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       ) : (
         <div
           className={cn(
@@ -228,7 +277,8 @@ export function ScoreBanner({ marked }: { marked: Set<number> }) {
 export function Legend() {
   return (
     <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-      <Check className="size-3.5" /> 1 pt por acerto · +5 por linha · +25 cartela cheia
+      <Check className="size-3.5" /> Vale se sair da boca de quem você apostou · 1 pt · +5 por linha · +25 cartela
+      cheia
     </p>
   )
 }
