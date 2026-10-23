@@ -45,7 +45,7 @@ export function Board({ cells, marked, onToggle }: Props) {
             onClick={() => onToggle?.(i)}
             aria-pressed={isMarked}
             className={cn(
-              "relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-l-4 bg-card p-1 text-center text-[0.6rem] leading-tight font-medium break-words transition-all select-none sm:p-2 sm:text-xs md:text-sm",
+              "relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-l-4 bg-card p-1 text-center text-[0.6rem] leading-tight font-bold uppercase break-words transition-all select-none sm:p-2 sm:text-xs md:text-sm",
               onToggle && "hover:bg-accent active:scale-95",
               SPEAKERS[cell.speaker].bar,
               isMarked && "bg-primary/10",

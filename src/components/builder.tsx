@@ -38,7 +38,7 @@ export function Builder({ onLock }: Props) {
     setPicked((p) => [...p, ...shuffle(ALL.filter((c) => !p.some((x) => x.text === c.text)))].slice(0, SLOTS))
 
   const addCustom = () => {
-    const text = custom.trim().slice(0, 80)
+    const text = custom.trim().slice(0, 40)
     if (!text || full || isPicked(text)) return
     setPicked((p) => [...p, { text, speaker: customSpeaker }])
     setCustom("")
@@ -120,8 +120,8 @@ export function Builder({ onLock }: Props) {
           <input
             value={custom}
             onChange={(e) => setCustom(e.target.value)}
-            placeholder="Ex.: “vou fazer o L ao vivo”"
-            maxLength={80}
+            placeholder="Ex.: Faz o L"
+            maxLength={40}
             className="h-9 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           />
           <select
