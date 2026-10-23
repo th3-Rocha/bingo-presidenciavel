@@ -32,7 +32,7 @@ type Shared = { name: string; slots: Slots }
 
 // Official events mark the card on their own; manual marks cover anything the feed missed.
 function marksFor(slots: Slots, manual: number[], said: Set<string>) {
-  const auto = slots.flatMap((c, s) => (c && cellSaid(c, said) ? [slotToBoard(s)] : []))
+  const auto = slots.flatMap((c, s) => (c && cellSaid(c, slotToBoard(s), said) ? [slotToBoard(s)] : []))
   return new Set([CENTER, ...manual, ...auto])
 }
 

@@ -5,28 +5,15 @@ import { Check, PenLine, X } from "lucide-react"
 
 import { Star } from "@/components/star"
 import { cn } from "@/lib/utils"
-import { SPEAKERS, type Speaker } from "@/lib/phrases"
-import { type Cell, CENTER, SIZE, type Slots, boardToSlot, cellSaid, score } from "@/lib/card"
+import { type Cell, CENTER, SIZE, type Slots, boardToSlot, cellSaid, score, speakerAt } from "@/lib/card"
 
 type Tone = "pt" | "verde"
 
-export const toneOf = (i: number): Tone => ((Math.floor(i / SIZE) + (i % SIZE)) % 2 === 0 ? "pt" : "verde")
+export const toneOf = (i: number): Tone => (speakerAt(i) === "lula" ? "pt" : "verde")
 
 const toneBg: Record<Tone, string> = {
   pt: "bg-pt text-papel",
   verde: "bg-verde text-papel",
-}
-
-export const speakerDot: Record<Speaker, string> = { lula: "bg-pt", flavio: "bg-verde" }
-
-function SpeakerTag({ speaker }: { speaker: Speaker }) {
-  return (
-    <span className="absolute top-0.5 left-0.5 z-10 flex items-center gap-0.5 rounded bg-noite/85 px-1 font-display text-[0.5rem] leading-tight tracking-wider text-papel sm:text-[0.6rem]">
-      <span className={cn("size-1.5 rounded-full", speakerDot[speaker])} />
-      <span className="sm:hidden">{SPEAKERS[speaker].short}</span>
-      <span className="hidden sm:inline">{SPEAKERS[speaker].label}</span>
-    </span>
-  )
 }
 
 /** The tile itself: checkerboard color, decoration, text, dauber when marked. */
@@ -35,14 +22,12 @@ export function CellFace({
   tone,
   marked = false,
   saiu = false,
-  showSpeaker = true,
   className,
 }: {
   cell: Cell
   tone: Tone
   marked?: boolean
   saiu?: boolean
-  showSpeaker?: boolean
   className?: string
 }) {
   return (
@@ -75,7 +60,6 @@ export function CellFace({
       >
         {cell.text}
       </span>
-      {showSpeaker && cell.speaker && <SpeakerTag speaker={cell.speaker} />}
       {saiu && (
         <span className="absolute top-0.5 right-0.5 z-10 rounded bg-amarelo px-1 font-display text-[0.5rem] tracking-wider text-noite sm:text-[0.6rem]">
           SAIU
@@ -113,6 +97,14 @@ function BoardFrame({ children }: { children: React.ReactNode }) {
         ))}
       </div>
       <div className="grid grid-cols-5 gap-1.5 sm:gap-2">{children}</div>
+      <div className="mt-2 flex justify-center gap-4 font-display text-xs tracking-widest uppercase sm:text-sm">
+        <span className="flex items-center gap-1.5">
+          <span className="size-3 rounded-sm bg-pt" /> Lula fala
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-3 rounded-sm bg-verde" /> Flávio fala
+        </span>
+      </div>
     </div>
   )
 }
@@ -148,7 +140,7 @@ export function PlayBoard({
               winning.has(i) && "rounded-xl ring-4 ring-amarelo"
             )}
           >
-            <CellFace cell={cell} tone={toneOf(i)} marked={marked.has(i)} saiu={cellSaid(cell, said)} />
+            <CellFace cell={cell} tone={toneOf(i)} marked={marked.has(i)} saiu={cellSaid(cell, i, said)} />
           </button>
         )
       })}
@@ -159,18 +151,17 @@ export function PlayBoard({
 type BuildProps = {
   slots: Slots
   onClear: (slot: number) => void
-  onAssign: (slot: number, speaker: Speaker) => void
 }
 
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear, onAssign }: BuildProps) {
+export function BuildBoard({ slots, onClear }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
         i === CENTER ? (
           <FreeCell key={i} win={false} />
         ) : (
-          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} onAssign={onAssign} />
+          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} />
         )
       )}
     </BoardFrame>
@@ -181,7 +172,6 @@ function BuildSlot({
   index,
   cell,
   onClear,
-  onAssign,
 }: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
   const slot = boardToSlot(index)
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `slot:${slot}` })
@@ -205,11 +195,10 @@ function BuildSlot({
           {...attributes}
           className={cn(
             "size-full cursor-grab rounded-lg active:cursor-grabbing",
-            !cell.speaker && "ring-2 ring-amarelo ring-offset-1 ring-offset-noite",
             isDragging && "opacity-30"
           )}
         >
-          <CellFace cell={cell} tone={tone} showSpeaker={false} className="pb-5 sm:pb-7" />
+          <CellFace cell={cell} tone={tone} />
           <button
             type="button"
             aria-label="Tirar"
@@ -219,26 +208,6 @@ function BuildSlot({
           >
             <X className="size-3" />
           </button>
-          <div
-            className="absolute inset-x-0.5 bottom-0.5 z-20 grid grid-cols-2 gap-0.5"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            {(Object.keys(SPEAKERS) as Speaker[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onAssign(slot, s)}
-                aria-pressed={cell.speaker === s}
-                className={cn(
-                  "rounded font-display text-[0.55rem] leading-4 tracking-wider transition-colors sm:text-xs sm:leading-5",
-                  cell.speaker === s ? "bg-papel text-noite" : "bg-noite/50 text-papel/80 hover:bg-noite/80"
-                )}
-              >
-                <span className="sm:hidden">{SPEAKERS[s].short}</span>
-                <span className="hidden sm:inline">{SPEAKERS[s].label}</span>
-              </button>
-            ))}
-          </div>
         </div>
       ) : (
         <div
@@ -277,7 +246,7 @@ export function ScoreBanner({ marked }: { marked: Set<number> }) {
 export function Legend() {
   return (
     <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-      <Check className="size-3.5" /> Vale se sair da boca de quem você apostou · 1 pt · +5 por linha · +25 cartela
+      <Check className="size-3.5" /> Vale se sair da boca da cor do quadrado · 1 pt · +5 por linha · +25 cartela
       cheia
     </p>
   )

@@ -18,7 +18,7 @@ import { Dices, Eraser, PenLine, Plus } from "lucide-react"
 import { BuildBoard, CellFace } from "@/components/board"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { POOL, type Speaker } from "@/lib/phrases"
+import { POOL } from "@/lib/phrases"
 import {
   type Cell,
   CUSTOM_REQUIRED,
@@ -57,8 +57,6 @@ export function Builder({ slots, onChange }: Props) {
   }
 
   const clear = (slot: number) => onChange(slots.map((c, i) => (i === slot ? null : c)))
-  const assign = (slot: number, speaker: Speaker) =>
-    onChange(slots.map((c, i) => (i === slot && c ? { ...c, speaker } : c)))
 
   const onDragStart = (e: DragStartEvent) => setDragging((e.active.data.current?.cell as Cell) ?? null)
 
@@ -89,7 +87,7 @@ export function Builder({ slots, onChange }: Props) {
   const addCustom = () => {
     const text = custom.trim().slice(0, 40)
     if (!text || customFull || used.has(normalize(text))) return
-    put({ text, speaker: null, custom: true })
+    put({ text, custom: true })
     setCustom("")
   }
 
@@ -119,13 +117,13 @@ export function Builder({ slots, onChange }: Props) {
                 variant="secondary"
                 size="sm"
                 onClick={() => onChange(fillFromList(slots))}
-                disabled={listFull && p.unassigned === 0}
+                disabled={listFull}
               >
                 <Dices /> Completar
               </Button>
             </div>
           </div>
-          <BuildBoard slots={slots} onClear={clear} onAssign={assign} />
+          <BuildBoard slots={slots} onClear={clear} />
           <Checklist {...p} />
         </div>
 
@@ -138,8 +136,8 @@ export function Builder({ slots, onChange }: Props) {
               </span>
             </h3>
             <p className="text-sm text-muted-foreground">
-              Escreva <strong className="text-papel">{CUSTOM_REQUIRED} frases suas</strong>, obrigatório. Depois escolha
-              na cartela quem vai falar.
+              Escreva <strong className="text-papel">{CUSTOM_REQUIRED} frases suas</strong>, obrigatório. Ponha no quadrado
+              da cor de quem vai falar.
             </p>
             <form
               className="flex gap-2"
@@ -177,7 +175,7 @@ export function Builder({ slots, onChange }: Props) {
   )
 }
 
-function Checklist({ list, custom, unassigned, complete }: ReturnType<typeof progress>) {
+function Checklist({ list, custom, complete }: ReturnType<typeof progress>) {
   if (complete) {
     return (
       <p className="text-center font-display tracking-wider text-amarelo uppercase">
@@ -188,7 +186,6 @@ function Checklist({ list, custom, unassigned, complete }: ReturnType<typeof pro
   const items = [
     { ok: list >= LIST_MAX, text: `${list}/${LIST_MAX} da lista` },
     { ok: custom >= CUSTOM_REQUIRED, text: `${custom}/${CUSTOM_REQUIRED} suas` },
-    { ok: unassigned === 0, text: unassigned ? `${unassigned} sem candidato` : "todas com candidato" },
   ]
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -206,7 +203,7 @@ function Checklist({ list, custom, unassigned, complete }: ReturnType<typeof pro
         ))}
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        Arraste pra cartela · arraste dentro pra trocar · embaixo de cada uma escolha Lula ou Flávio
+        Vermelho = Lula vai falar · verde = Flávio vai falar · arraste dentro pra trocar de lado
       </p>
     </div>
   )
@@ -233,7 +230,7 @@ function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean
 }
 
 function PoolChip({ text, disabled, onPick }: { text: string; disabled: boolean; onPick: (cell: Cell) => void }) {
-  const cell: Cell = { text, speaker: null }
+  const cell: Cell = { text }
   const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
     id: `pool:${text}`,
     data: { cell },

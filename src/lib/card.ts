@@ -6,7 +6,7 @@ export const SLOTS = SIZE * SIZE - 1
 export const CUSTOM_REQUIRED = 5
 export const LIST_MAX = SLOTS - CUSTOM_REQUIRED
 
-export type Cell = { text: string; speaker: Speaker | null; custom?: boolean }
+export type Cell = { text: string; custom?: boolean }
 export type Slots = (Cell | null)[] // SLOTS entries; the free center is not stored
 
 export type Card = {
@@ -28,18 +28,20 @@ export const LINES: number[][] = (() => {
 export const slotToBoard = (slot: number) => (slot < CENTER ? slot : slot + 1)
 export const boardToSlot = (i: number) => (i < CENTER ? i : i - 1)
 
+// The bet is the square's color: red squares are Lula's, green ones Flávio's.
+export const speakerAt = (boardIndex: number): Speaker =>
+  (Math.floor(boardIndex / SIZE) + (boardIndex % SIZE)) % 2 === 0 ? "lula" : "flavio"
+
 export const emptySlots = (): Slots => Array(SLOTS).fill(null)
 
 export function progress(slots: Slots) {
   const cells = slots.filter((c): c is Cell => !!c)
   const custom = cells.filter((c) => c.custom).length
-  const unassigned = cells.filter((c) => !c.speaker).length
   return {
     filled: cells.length,
     custom,
     list: cells.length - custom,
-    unassigned,
-    complete: cells.length === SLOTS && custom >= CUSTOM_REQUIRED && unassigned === 0,
+    complete: cells.length === SLOTS && custom >= CUSTOM_REQUIRED,
   }
 }
 
@@ -62,8 +64,8 @@ export const normalize = (text: string) =>
 // the player bet on; events tagged "ambos" (null) count for either.
 export const saidKey = (text: string, speaker: Speaker | null) => `${speaker ?? "*"}:${normalize(text)}`
 
-export const cellSaid = (cell: Cell, said: Set<string>) =>
-  said.has(saidKey(cell.text, null)) || (!!cell.speaker && said.has(saidKey(cell.text, cell.speaker)))
+export const cellSaid = (cell: Cell, boardIndex: number, said: Set<string>) =>
+  said.has(saidKey(cell.text, null)) || said.has(saidKey(cell.text, speakerAt(boardIndex)))
 
 export function shuffle<T>(items: T[]): T[] {
   const out = [...items]
@@ -74,8 +76,6 @@ export function shuffle<T>(items: T[]): T[] {
   return out
 }
 
-const randomSpeaker = (): Speaker => (Math.random() < 0.5 ? "lula" : "flavio")
-
 // "Completar": fills list slots only, leaving room for the player's own phrases.
 export function fillFromList(slots: Slots): Slots {
   const { filled, custom } = progress(slots)
@@ -83,10 +83,10 @@ export function fillFromList(slots: Slots): Slots {
   const extra = shuffle(POOL.filter((t) => !used.has(normalize(t))))
   let room = SLOTS - filled - Math.max(0, CUSTOM_REQUIRED - custom)
   return slots.map((c) => {
-    if (c) return c.speaker ? c : { ...c, speaker: randomSpeaker() }
+    if (c) return c
     if (room <= 0) return null
     room--
-    return { text: extra.pop()!, speaker: randomSpeaker() }
+    return { text: extra.pop()! }
   })
 }
 
@@ -94,19 +94,15 @@ export function fillFromList(slots: Slots): Slots {
 export function fillEmpty(slots: Slots): Cell[] {
   const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
   const extra = shuffle(POOL.filter((t) => !used.has(normalize(t))))
-  return slots.map((c) =>
-    c ? (c.speaker ? c : { ...c, speaker: randomSpeaker() }) : { text: extra.pop()!, speaker: randomSpeaker() }
-  )
+  return slots.map((c) => c ?? { text: extra.pop()! })
 }
-
-const SPEAKER_CODES: Speaker[] = ["lula", "flavio"]
 
 // Shared links carry the whole card, so nothing about players is stored server-side.
 export function encodeCard(card: Pick<Card, "name" | "slots">) {
   const payload = {
     n: card.name,
     c: card.slots.map((c) =>
-      c ? [c.text, c.speaker ? SPEAKER_CODES.indexOf(c.speaker) : -1, c.custom ? 1 : 0] : 0
+      c ? [c.text, c.custom ? 1 : 0] : 0
     ),
   }
   const bytes = new TextEncoder().encode(JSON.stringify(payload))
@@ -119,14 +115,14 @@ export function decodeCard(raw: string): Pick<Card, "name" | "slots"> | null {
     const bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))
     const payload = JSON.parse(new TextDecoder().decode(bytes)) as {
       n: string
-      c: ([string, number, number?] | 0)[]
+      c: ([string, number?] | 0)[]
     }
     if (!Array.isArray(payload.c) || payload.c.length !== SLOTS) return null
     return {
       name: String(payload.n ?? "").slice(0, 30),
       slots: payload.c.map((c) =>
         Array.isArray(c)
-          ? { text: String(c[0]).slice(0, 40), speaker: SPEAKER_CODES[c[1]] ?? null, custom: c[2] === 1 }
+          ? { text: String(c[0]).slice(0, 40), custom: c[1] === 1 }
           : null
       ),
     }
@@ -135,7 +131,7 @@ export function decodeCard(raw: string): Pick<Card, "name" | "slots"> | null {
   }
 }
 
-const STORAGE_KEY = "bingo-debate-card-v4"
+const STORAGE_KEY = "bingo-debate-card-v5"
 
 export function loadCard(): Card | null {
   try {
