@@ -13,12 +13,13 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { Dices, Eraser, PenLine, Plus } from "lucide-react"
+import { Dices, Eraser, PenLine, Plus, Search } from "lucide-react"
 
 import { BuildBoard, CellFace } from "@/components/board"
+import { Flag, Star } from "@/components/star"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { POOL } from "@/lib/phrases"
+import { POOL, type Speaker } from "@/lib/phrases"
 import {
   type Cell,
   CUSTOM_REQUIRED,
@@ -29,6 +30,8 @@ import {
   fillFromList,
   normalize,
   progress,
+  slotToBoard,
+  speakerAt,
 } from "@/lib/card"
 
 type Props = {
@@ -39,24 +42,44 @@ type Props = {
 export function Builder({ slots, onChange }: Props) {
   const [dragging, setDragging] = useState<Cell | null>(null)
   const [custom, setCustom] = useState("")
+  const [side, setSide] = useState<Speaker>("lula")
+  const [target, setTarget] = useState<number | null>(null)
+  const [nope, setNope] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } })
   )
 
   const used = new Set(slots.flatMap((c) => (c ? [normalize(c.text)] : [])))
   const p = progress(slots)
   const listFull = p.list >= LIST_MAX || p.filled >= SLOTS
   const customFull = p.custom >= CUSTOM_REQUIRED || p.filled >= SLOTS
+  const freeOf = (s: Speaker) => slots.filter((c, i) => !c && speakerAt(slotToBoard(i)) === s).length
 
-  const put = (cell: Cell, at?: number) => {
-    const target = at ?? slots.indexOf(null)
-    if (target === -1 || used.has(normalize(cell.text))) return
-    onChange(slots.map((c, i) => (i === target ? cell : c)))
+  // Tapping: goes to the picked square, else the next free square of the chosen color.
+  const put = (cell: Cell) => {
+    if (used.has(normalize(cell.text))) return false
+    const at =
+      target !== null && !slots[target]
+        ? target
+        : slots.findIndex((c, i) => !c && speakerAt(slotToBoard(i)) === side)
+    if (at === -1) {
+      setNope(true)
+      setTimeout(() => setNope(false), 600)
+      return false
+    }
+    onChange(slots.map((c, i) => (i === at ? cell : c)))
+    setTarget(null)
+    return true
   }
 
   const clear = (slot: number) => onChange(slots.map((c, i) => (i === slot ? null : c)))
+
+  const pickTarget = (slot: number) => {
+    setTarget((t) => (t === slot ? null : slot))
+    setSide(speakerAt(slotToBoard(slot)))
+  }
 
   const onDragStart = (e: DragStartEvent) => setDragging((e.active.data.current?.cell as Cell) ?? null)
 
@@ -65,13 +88,13 @@ export function Builder({ slots, onChange }: Props) {
     if (!over) return
     const cell = active.data.current?.cell as Cell
     const from = String(active.id).startsWith("cell:") ? Number(String(active.id).slice(5)) : null
-    const target = String(over.id)
+    const dest = String(over.id)
 
-    if (target === "pool") {
+    if (dest === "pool") {
       if (from !== null) clear(from)
       return
     }
-    const to = Number(target.slice(5))
+    const to = Number(dest.slice(5))
     if (from !== null) {
       const next = [...slots]
       ;[next[from], next[to]] = [next[to], next[from]]
@@ -86,9 +109,8 @@ export function Builder({ slots, onChange }: Props) {
 
   const addCustom = () => {
     const text = custom.trim().slice(0, 40)
-    if (!text || customFull || used.has(normalize(text))) return
-    put({ text, custom: true })
-    setCustom("")
+    if (!text || customFull) return
+    if (put({ text, custom: true })) setCustom("")
   }
 
   return (
@@ -98,47 +120,60 @@ export function Builder({ slots, onChange }: Props) {
       onDragEnd={onDragEnd}
       onDragCancel={() => setDragging(null)}
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
         <div className="flex flex-col gap-3 lg:sticky lg:top-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-display text-xl tracking-wide uppercase">
+            <h2 className="font-display text-2xl tracking-wide uppercase">
               Sua cartela{" "}
               <span className={cn("tabular-nums", p.complete ? "text-amarelo" : "text-muted-foreground")}>
                 {p.filled}/{SLOTS}
               </span>
-            </span>
-            <div className="flex gap-1.5">
+            </h2>
+            <div className="flex gap-1">
               {p.filled > 0 && (
                 <Button variant="ghost" size="sm" onClick={() => onChange(emptySlots())}>
-                  <Eraser /> Limpar
+                  <Eraser /> <span className="hidden sm:inline">Limpar</span>
                 </Button>
               )}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onChange(fillFromList(slots))}
-                disabled={listFull}
-              >
+              <Button variant="secondary" size="sm" onClick={() => onChange(fillFromList(slots))} disabled={listFull}>
                 <Dices /> Completar
               </Button>
             </div>
           </div>
-          <BuildBoard slots={slots} onClear={clear} ownOnly={p.list >= LIST_MAX} />
+          <BuildBoard
+            slots={slots}
+            onClear={clear}
+            ownOnly={p.list >= LIST_MAX}
+            target={target}
+            onTarget={pickTarget}
+          />
           <Checklist {...p} />
         </div>
 
         <div className="flex flex-col gap-4">
-          <section className="flex flex-col gap-3 rounded-2xl bg-amarelo/10 p-4 ring-2 ring-amarelo/60">
+          <SidePicker
+            side={side}
+            onSide={(s) => {
+              setSide(s)
+              setTarget(null)
+            }}
+            free={{ lula: freeOf("lula"), flavio: freeOf("flavio") }}
+            nope={nope}
+            target={target !== null}
+          />
+
+          <section className="flex flex-col gap-3 rounded-2xl bg-amarelo/10 p-4 ring-2 ring-amarelo/50">
             <h3 className="flex items-center gap-2 font-display text-lg tracking-widest uppercase">
-              <PenLine className="size-4 text-amarelo" /> Tem uma melhor?
-              <span className={cn("ml-auto tabular-nums", p.custom >= CUSTOM_REQUIRED ? "text-amarelo" : "text-muted-foreground")}>
+              <PenLine className="size-4 text-amarelo" /> Suas frases
+              <span
+                className={cn(
+                  "ml-auto tabular-nums",
+                  p.custom >= CUSTOM_REQUIRED ? "text-amarelo" : "text-muted-foreground"
+                )}
+              >
                 {p.custom}/{CUSTOM_REQUIRED}
               </span>
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Escreva <strong className="text-papel">{CUSTOM_REQUIRED} frases suas</strong>, obrigatório. Ponha no quadrado
-              da cor de quem vai falar.
-            </p>
             <form
               className="flex gap-2"
               onSubmit={(e) => {
@@ -149,18 +184,19 @@ export function Builder({ slots, onChange }: Props) {
               <input
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
-                placeholder="Ex.: Faz o L"
+                placeholder={customFull ? "Já tem as 5 ✓" : "Escreve uma (obrigatório 5)"}
                 maxLength={40}
                 disabled={customFull}
-                className="h-10 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 font-display tracking-wide uppercase outline-none placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                enterKeyHint="done"
+                className="h-11 min-w-0 flex-1 rounded-xl border bg-background/60 px-3 font-display tracking-wide uppercase outline-none placeholder:normal-case placeholder:font-sans placeholder:tracking-normal placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
               />
-              <Button type="submit" size="lg" className="h-10" disabled={customFull || !custom.trim()}>
+              <Button type="submit" size="lg" className="h-11 rounded-xl" disabled={customFull || !custom.trim()}>
                 <Plus /> Pôr
               </Button>
             </form>
           </section>
 
-          <Pool used={used} disabled={listFull} onPick={(cell) => put(cell)} />
+          <Pool used={used} disabled={listFull} onPick={put} />
         </div>
       </div>
 
@@ -172,6 +208,52 @@ export function Builder({ slots, onChange }: Props) {
         )}
       </DragOverlay>
     </DndContext>
+  )
+}
+
+function SidePicker({
+  side,
+  onSide,
+  free,
+  nope,
+  target,
+}: {
+  side: Speaker
+  onSide: (s: Speaker) => void
+  free: Record<Speaker, number>
+  nope: boolean
+  target: boolean
+}) {
+  const options = [
+    { s: "lula" as const, label: "Lula", Icon: Star, on: "bg-pt text-papel ring-pt", off: "text-pt" },
+    { s: "flavio" as const, label: "Flávio", Icon: Flag, on: "bg-verde text-papel ring-verde", off: "text-verde" },
+  ]
+  return (
+    <div className={cn("flex flex-col gap-2", nope && "animate-[shake_0.3s_ease-in-out_2]")}>
+      <p className="text-sm text-muted-foreground">
+        {target ? "Agora toque na frase pro quadrado escolhido." : "Toque numa frase pra pôr no quadrado de quem vai falar:"}
+      </p>
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-card/60 p-1.5 ring-1 ring-border">
+        {options.map(({ s, label, Icon, on, off }) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onSide(s)}
+            aria-pressed={side === s}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl py-2.5 font-display text-lg tracking-wider uppercase transition-all",
+              side === s ? cn(on, "shadow-lg") : cn(off, "hover:bg-secondary")
+            )}
+          >
+            <Icon className={cn("shrink-0", s === "lula" ? "size-4" : "w-6")} />
+            {label}
+            <span className={cn("text-xs tabular-nums", side === s ? "opacity-80" : "opacity-60")}>
+              {free[s]} vagas
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -202,8 +284,8 @@ function Checklist({ list, custom, complete }: ReturnType<typeof progress>) {
           </span>
         ))}
       </div>
-      <p className="text-center text-xs text-muted-foreground">
-        Vermelho = Lula vai falar · verde = Flávio vai falar · arraste dentro pra trocar de lado
+      <p className="hidden text-center text-xs text-muted-foreground sm:block">
+        Arraste as frases pra cartela · arraste dentro pra trocar de lado · × tira
       </p>
     </div>
   )
@@ -211,6 +293,10 @@ function Checklist({ list, custom, complete }: ReturnType<typeof progress>) {
 
 function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean; onPick: (cell: Cell) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: "pool" })
+  const [query, setQuery] = useState("")
+  const q = normalize(query)
+  const items = POOL.filter((text) => !used.has(normalize(text)) && normalize(text).includes(q))
+
   return (
     <section
       ref={setNodeRef}
@@ -219,11 +305,28 @@ function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean
         isOver && "bg-pt/10 ring-2 ring-pt"
       )}
     >
-      <h3 className="font-display text-lg tracking-widest uppercase">Frases</h3>
-      <div className="flex flex-wrap gap-1.5">
-        {POOL.filter((text) => !used.has(normalize(text))).map((text) => (
+      <div className="flex items-center gap-3">
+        <h3 className="font-display text-lg tracking-widest uppercase">Frases</h3>
+        <label className="ml-auto flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full border bg-background/60 px-3 sm:max-w-56">
+          <Search className="size-4 shrink-0 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+          />
+        </label>
+      </div>
+      {disabled && (
+        <p className="rounded-lg bg-amarelo/10 px-3 py-2 text-sm text-amarelo">
+          Já tem as {LIST_MAX} da lista. Os quadrados que sobraram são pras suas frases.
+        </p>
+      )}
+      <div className="-mx-1 flex max-h-[45vh] flex-wrap content-start gap-1.5 overflow-y-auto px-1 pb-1 lg:max-h-[60vh]">
+        {items.map((text) => (
           <PoolChip key={text} text={text} disabled={disabled} onPick={onPick} />
         ))}
+        {items.length === 0 && <p className="text-sm text-muted-foreground">Nada com “{query}”.</p>}
       </div>
     </section>
   )
@@ -245,7 +348,7 @@ function PoolChip({ text, disabled, onPick }: { text: string; disabled: boolean;
       onClick={() => onPick(cell)}
       disabled={disabled}
       className={cn(
-        "cursor-grab rounded-full border border-border bg-secondary px-3 py-1.5 font-display text-sm tracking-wide uppercase transition-all select-none hover:-translate-y-0.5 hover:border-amarelo active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40",
+        "rounded-full border border-border bg-secondary px-3 py-2 font-display text-sm tracking-wide uppercase transition-all select-none hover:border-amarelo active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:cursor-grab sm:py-1.5 sm:hover:-translate-y-0.5",
         isDragging && "opacity-30"
       )}
     >

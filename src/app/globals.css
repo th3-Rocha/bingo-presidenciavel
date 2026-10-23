@@ -140,6 +140,11 @@
   }
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
 @keyframes stamp {
   from { transform: scale(1.8) rotate(-20deg); opacity: 0; }
   to { transform: scale(1) rotate(-12deg); opacity: 1; }

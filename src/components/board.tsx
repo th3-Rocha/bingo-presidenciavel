@@ -151,17 +151,28 @@ type BuildProps = {
   onClear: (slot: number) => void
   /** Once the list quota is used up, empty squares can only take the player's own phrases. */
   ownOnly?: boolean
+  /** Empty square picked by tapping: the next phrase goes there. */
+  target?: number | null
+  onTarget?: (slot: number) => void
 }
 
 /** Build mode: every slot is a drop target, filled slots can be dragged around. */
-export function BuildBoard({ slots, onClear, ownOnly }: BuildProps) {
+export function BuildBoard({ slots, onClear, ownOnly, target, onTarget }: BuildProps) {
   return (
     <BoardFrame>
       {Array.from({ length: SIZE * SIZE }, (_, i) =>
         i === CENTER ? (
           <FreeCell key={i} win={false} />
         ) : (
-          <BuildSlot key={i} index={i} cell={slots[boardToSlot(i)]} onClear={onClear} ownOnly={ownOnly} />
+          <BuildSlot
+            key={i}
+            index={i}
+            cell={slots[boardToSlot(i)]}
+            onClear={onClear}
+            ownOnly={ownOnly}
+            target={target}
+            onTarget={onTarget}
+          />
         )
       )}
     </BoardFrame>
@@ -173,6 +184,8 @@ function BuildSlot({
   cell,
   onClear,
   ownOnly,
+  target,
+  onTarget,
 }: { index: number; cell: Cell | null } & Omit<BuildProps, "slots">) {
   const slot = boardToSlot(index)
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `slot:${slot}` })
@@ -211,11 +224,16 @@ function BuildSlot({
           </button>
         </div>
       ) : (
-        <div
+        <button
+          type="button"
+          onClick={() => onTarget?.(slot)}
+          aria-label="Escolher este quadrado"
+          aria-pressed={target === slot}
           className={cn(
-            "flex size-full flex-col items-center justify-center rounded-lg border-2 border-dashed font-display",
+            "flex size-full flex-col items-center justify-center rounded-lg border-2 border-dashed font-display transition-colors",
             tone === "pt" ? "border-pt/60 bg-pt/10 text-pt/70" : "border-verde/60 bg-verde/10 text-verde/70",
-            ownOnly && "border-amarelo/70 text-amarelo"
+            ownOnly && "border-amarelo/70 text-amarelo",
+            target === slot && (tone === "pt" ? "border-solid bg-pt/45 text-papel" : "border-solid bg-verde/45 text-papel")
           )}
         >
           {ownOnly ? (
@@ -226,7 +244,7 @@ function BuildSlot({
           ) : (
             <span className="text-xl">+</span>
           )}
-        </div>
+        </button>
       )}
     </div>
   )

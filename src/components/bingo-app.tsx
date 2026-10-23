@@ -79,26 +79,35 @@ export function BingoApp() {
     )
   }
 
+  const p = progress(card.slots)
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-24">
       <StatusBar locked={live.locked} msToLock={live.msToLock} />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={card.name}
-          onChange={(e) => setCard({ ...card, name: e.target.value.slice(0, 30) })}
-          placeholder="Seu nome"
-          aria-label="Seu nome"
-          className="h-10 min-w-0 flex-1 rounded-lg border bg-card/60 px-3 font-display text-lg tracking-wide uppercase outline-none placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
-        <ShareButton card={card} said={live.said} disabled={!live.locked && !progress(card.slots).complete} />
-      </div>
 
       {live.locked ? (
         <PlayView card={card} said={live.said} events={live.events} onChange={setCard} />
       ) : (
         <Builder slots={card.slots} onChange={(slots) => setCard({ ...card, slots })} />
       )}
+
+      {/* Always-visible bar: name + share, so nobody has to scroll back up on a phone. */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-noite/85 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+        <div className="mx-auto flex max-w-xl items-center gap-2">
+          <input
+            value={card.name}
+            onChange={(e) => setCard({ ...card, name: e.target.value.slice(0, 30) })}
+            placeholder="Seu nome"
+            aria-label="Seu nome"
+            className="h-11 min-w-0 flex-1 rounded-xl border bg-card px-3 font-display text-lg tracking-wide uppercase outline-none placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
+          <ShareButton
+            card={card}
+            said={live.said}
+            disabled={!live.locked && !p.complete}
+            hint={live.locked || p.complete ? null : `${p.filled}/${SLOTS}`}
+          />
+        </div>
+      </div>
     </div>
   )
 }
@@ -106,8 +115,8 @@ export function BingoApp() {
 function StatusBar({ locked, msToLock }: { locked: boolean; msToLock: number }) {
   if (locked) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl bg-pt px-4 py-2.5 font-display tracking-widest uppercase">
-        <span className="size-2.5 animate-pulse rounded-full bg-papel" /> Ao vivo · cartelas travadas · marque o que sair
+      <div className="flex items-center justify-center gap-2 rounded-2xl bg-pt px-4 py-3 text-center font-display tracking-widest uppercase">
+        <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-papel" /> Ao vivo · toque no que sair
       </div>
     )
   }
@@ -115,16 +124,25 @@ function StatusBar({ locked, msToLock }: { locked: boolean; msToLock: number }) 
   const pad = (n: number) => String(n).padStart(2, "0")
   const clock = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl bg-card px-4 py-2.5 ring-1 ring-border">
-      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Lock className="size-3.5" /> Cartelas travam às 21h20 em
-      </span>
+    <div className="mx-auto flex items-center gap-3 rounded-full bg-card px-5 py-2 ring-1 ring-border">
+      <Lock className="size-4 text-muted-foreground" />
+      <span className="text-sm text-muted-foreground">Trava em</span>
       <span className="font-display text-2xl tracking-wider text-amarelo tabular-nums">{clock}</span>
     </div>
   )
 }
 
-function ShareButton({ card, said, disabled }: { card: Card; said: Set<string>; disabled: boolean }) {
+function ShareButton({
+  card,
+  said,
+  disabled,
+  hint,
+}: {
+  card: Card
+  said: Set<string>
+  disabled: boolean
+  hint: string | null
+}) {
   const [copied, setCopied] = useState(false)
   const share = async () => {
     const url = `${window.location.origin}/?c=${encodeCard(card)}`
@@ -143,8 +161,14 @@ function ShareButton({ card, said, disabled }: { card: Card; said: Set<string>; 
     } catch {}
   }
   return (
-    <Button size="lg" className="h-10 font-display tracking-wider uppercase" onClick={share} disabled={disabled}>
-      {copied ? <Check /> : <Share2 />} {copied ? "Copiado" : "Compartilhar"}
+    <Button
+      size="lg"
+      className="h-11 rounded-xl px-4 font-display text-base tracking-wider uppercase"
+      onClick={share}
+      disabled={disabled}
+    >
+      {copied ? <Check /> : <Share2 />} {copied ? "Copiado" : "Mandar"}
+      {hint && <span className="text-xs tabular-nums opacity-70">{hint}</span>}
     </Button>
   )
 }
