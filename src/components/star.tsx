@@ -8,3 +8,17 @@ export function Star({ className }: { className?: string }) {
     </svg>
   )
 }
+
+/** Brazil flag silhouette (diamond, globe and band) drawn in one color, like the star. */
+export function Flag({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 28 20" aria-hidden className={className}>
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M14 1.5 26.5 10 14 18.5 1.5 10zM14 5.2a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6z"
+      />
+      <path d="M9.4 8.6c3-.9 6.6-.6 9.2 1" fill="none" stroke="currentColor" strokeWidth="1.1" />
+    </svg>
+  )
+}

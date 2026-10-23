@@ -3,7 +3,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core"
 import { Check, PenLine, X } from "lucide-react"
 
-import { Star } from "@/components/star"
+import { Flag, Star } from "@/components/star"
 import { cn } from "@/lib/utils"
 import { type Cell, CENTER, SIZE, type Slots, boardToSlot, cellSaid, score, speakerAt } from "@/lib/card"
 
@@ -42,9 +42,7 @@ export function CellFace({
       {tone === "pt" ? (
         <Star className="pointer-events-none absolute -right-2 -bottom-2 size-10 text-papel/15 sm:size-14" />
       ) : (
-        <span className="pointer-events-none absolute right-1 bottom-0.5 text-[0.6rem] opacity-60 sm:text-sm">
-          🇧🇷
-        </span>
+        <Flag className="pointer-events-none absolute -right-3 -bottom-2 w-14 -rotate-12 text-papel/15 sm:w-20" />
       )}
       {cell.custom && (
         <PenLine className="pointer-events-none absolute bottom-1 left-1 size-2.5 opacity-60 sm:size-3" />
