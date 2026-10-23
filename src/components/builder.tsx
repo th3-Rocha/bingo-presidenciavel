@@ -19,7 +19,7 @@ import { BuildBoard, CellFace } from "@/components/board"
 import { Flag, Star } from "@/components/star"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { POOL, type Speaker } from "@/lib/phrases"
+import { POOL_GROUPS, type Speaker } from "@/lib/phrases"
 import {
   type Cell,
   type Slots,
@@ -224,7 +224,10 @@ function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean
   const { setNodeRef, isOver } = useDroppable({ id: "pool" })
   const [query, setQuery] = useState("")
   const q = normalize(query)
-  const items = POOL.filter((text) => !used.has(normalize(text)) && normalize(text).includes(q))
+  const groups = POOL_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((text) => !used.has(normalize(text)) && normalize(text).includes(q)),
+  })).filter((g) => g.items.length > 0)
 
   return (
     <section
@@ -246,11 +249,20 @@ function Pool({ used, disabled, onPick }: { used: Set<string>; disabled: boolean
           />
         </label>
       </div>
-      <div className="-mx-1 flex max-h-[45vh] flex-wrap content-start gap-1.5 overflow-y-auto px-1 pb-1 lg:max-h-[60vh]">
-        {items.map((text) => (
-          <PoolChip key={text} text={text} disabled={disabled} onPick={onPick} />
+      <div className="-mx-1 flex max-h-[50vh] flex-col gap-4 overflow-y-auto px-1 pb-1 lg:max-h-[65vh]">
+        {groups.map((g) => (
+          <div key={g.title} className="flex flex-col gap-1.5">
+            <h4 className="sticky top-0 z-10 -mx-1 bg-card/95 px-1 py-0.5 text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase backdrop-blur">
+              {g.title}
+            </h4>
+            <div className="flex flex-wrap gap-1.5">
+              {g.items.map((text) => (
+                <PoolChip key={text} text={text} disabled={disabled} onPick={onPick} />
+              ))}
+            </div>
+          </div>
         ))}
-        {items.length === 0 && <p className="text-sm text-muted-foreground">Nada com “{query}”.</p>}
+        {groups.length === 0 && <p className="text-sm text-muted-foreground">Nada com “{query}”.</p>}
       </div>
     </section>
   )
