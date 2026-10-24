@@ -20,7 +20,6 @@ import {
   emptySlots,
   encodeCard,
   cellSaid,
-  fillEmpty,
   loadCard,
   progress,
   saveCard,
@@ -54,15 +53,6 @@ export function BingoApp() {
     if (card) saveCard(card)
   }, [card])
 
-  // At 21h20 any gaps get filled so everyone plays a full card.
-  const incomplete = !!card?.slots.includes(null)
-  useEffect(() => {
-    if (live.locked && incomplete) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCard((c) => (c ? { ...c, slots: fillEmpty(c.slots) } : c))
-    }
-  }, [live.locked, incomplete])
-
   if (!card) {
     return <div className="mx-auto aspect-square w-full max-w-xl animate-pulse rounded-2xl bg-card" />
   }
@@ -71,7 +61,8 @@ export function BingoApp() {
     return (
       <SharedView
         shared={shared}
-        said={live.said}
+        said={card.revealed ? live.said : EMPTY}
+        hidden={!card.revealed}
         onBuildOwn={() => {
           window.history.replaceState(null, "", window.location.pathname)
           setShared(null)
@@ -81,26 +72,16 @@ export function BingoApp() {
   }
 
   const p = progress(card.slots)
+  // Results stay hidden until the full card goes out, so nobody builds it off the feed.
+  const revealed = !!card.revealed && p.complete
   return (
     <div className="flex min-w-0 flex-col gap-6 pb-24">
-      <StatusBar locked={live.locked} msToLock={live.msToLock} />
-
-      {live.locked ? (
-        // The fill-on-lock effect runs right after this render; never draw a card with gaps.
-        incomplete ? (
-          <div className="mx-auto aspect-square w-full max-w-xl animate-pulse rounded-2xl bg-card" />
-        ) : (
-          <PlayView card={card} said={live.said} events={live.events} onChange={setCard} />
-        )
+      {revealed ? (
+        <PlayView card={card} said={live.said} events={live.events} onChange={setCard} />
       ) : (
         <>
-          {/* Before 21h20 the feed already scores the card, so the admin can be tested live. */}
-          <ScoreBanner
-            marked={marksFor(card.slots, [], live.said)}
-            misses={tally(card.slots, live.said).misses}
-          />
-          <Builder slots={card.slots} said={live.said} onChange={(slots) => setCard({ ...card, slots })} />
-          {live.events.length > 0 && <LiveFeed events={live.events} />}
+          <Hidden count={live.events.length} filled={p.filled} />
+          <Builder slots={card.slots} said={EMPTY} onChange={(slots) => setCard({ ...card, slots })} />
         </>
       )}
 
@@ -116,9 +97,10 @@ export function BingoApp() {
           />
           <ShareButton
             card={card}
-            said={live.said}
-            disabled={!live.locked && !p.complete}
-            hint={live.locked || p.complete ? null : `${p.filled}/${SLOTS}`}
+            said={revealed ? live.said : EMPTY}
+            disabled={!p.complete}
+            hint={p.complete ? null : `${p.filled}/${SLOTS}`}
+            onShared={() => setCard((c) => (c && !c.revealed ? { ...c, revealed: true } : c))}
           />
         </div>
       </div>
@@ -126,22 +108,23 @@ export function BingoApp() {
   )
 }
 
-function StatusBar({ locked, msToLock }: { locked: boolean; msToLock: number }) {
-  if (locked) {
-    return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl bg-pt px-4 py-3 text-center font-display tracking-widest uppercase">
-        <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-papel" /> Ao vivo · toque no que sair
-      </div>
-    )
-  }
-  const s = Math.floor(msToLock / 1000)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  const clock = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`
+const EMPTY = new Set<string>()
+
+function Hidden({ count, filled }: { count: number; filled: number }) {
   return (
-    <div className="mx-auto flex items-center gap-3 rounded-full bg-card px-5 py-2 ring-1 ring-border">
-      <Lock className="size-4 text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">Trava em</span>
-      <span className="font-display text-2xl tracking-wider text-amarelo tabular-nums">{clock}</span>
+    <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl bg-card px-4 py-3 text-sm ring-1 ring-border">
+      <Lock className="size-5 shrink-0 text-amarelo" />
+      <span className="text-muted-foreground">
+        {count > 0 ? (
+          <>
+            <strong className="text-foreground">{count} fala{count === 1 ? "" : "s"}</strong> já saiu
+            {count === 1 ? "" : "ram"} no debate.{" "}
+          </>
+        ) : null}
+        {filled < SLOTS
+          ? "Complete as 24 e mande pra galera pra ver o placar. Depois disso a cartela trava."
+          : "Cartela cheia! Toque em “Mandar” pra ver o placar. Depois disso ela trava."}
+      </span>
     </div>
   )
 }
@@ -151,11 +134,13 @@ function ShareButton({
   said,
   disabled,
   hint,
+  onShared,
 }: {
   card: Card
   said: Set<string>
   disabled: boolean
   hint: string | null
+  onShared: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -171,10 +156,11 @@ function ShareButton({
     const pts = score(marksFor(card.slots, card.marked, said)).points
     const text = said.size
       ? `Tô com ${pts} pontos no Bingo do Debate 🇧🇷 Olha minha cartela:`
-      : "Meus palpites pro debate de hoje 🇧🇷 Monta a sua antes das 21h20:"
+      : "Meus palpites pro debate 🇧🇷 Monta a sua:"
     try {
       if (navigator.share) {
         await navigator.share({ text, url })
+        onShared()
         return
       }
     } catch (e) {
@@ -183,11 +169,13 @@ function ShareButton({
     }
     try {
       await navigator.clipboard.writeText(`${text} ${url}`)
+      onShared()
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // In-app browsers (Instagram, WhatsApp) may block both: show the link to copy by hand.
       setFallback(url)
+      onShared()
     }
   }
 
@@ -305,7 +293,17 @@ function LiveFeed({ events }: { events: DebateEvent[] }) {
   )
 }
 
-function SharedView({ shared, said, onBuildOwn }: { shared: Shared; said: Set<string>; onBuildOwn: () => void }) {
+function SharedView({
+  shared,
+  said,
+  hidden,
+  onBuildOwn,
+}: {
+  shared: Shared
+  said: Set<string>
+  hidden: boolean
+  onBuildOwn: () => void
+}) {
   const complete = shared.slots.filter(Boolean).length === SLOTS
   const marked = useMemo(() => marksFor(shared.slots, [], said), [shared, said])
   return (
@@ -318,6 +316,12 @@ function SharedView({ shared, said, onBuildOwn }: { shared: Shared; said: Set<st
           Montar a minha
         </Button>
       </div>
+      {hidden && (
+        <p className="rounded-2xl bg-card px-4 py-3 text-sm text-muted-foreground ring-1 ring-border">
+          <Lock className="mr-1.5 inline size-4 text-amarelo" />
+          Monte e mande a sua cartela pra ver os acertos dessa aqui.
+        </p>
+      )}
       {said.size > 0 && <ScoreBanner marked={marked} misses={tally(shared.slots, said).misses} />}
       {complete && <PlayBoard slots={shared.slots as Cell[]} marked={marked} said={said} />}
     </div>

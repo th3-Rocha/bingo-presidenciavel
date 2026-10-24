@@ -11,6 +11,8 @@ export type Card = {
   name: string
   slots: Slots
   marked: number[] // board indexes (0..24), center implied
+  /** Set once the full card was shared: results show and the card is frozen. */
+  revealed?: boolean
 }
 
 export const LINES: number[][] = (() => {
